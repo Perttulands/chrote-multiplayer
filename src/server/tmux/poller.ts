@@ -3,10 +3,14 @@
  *
  * Polls tmux sessions at 5 FPS (200ms) and emits output changes.
  * Detects session creation/destruction.
+ *
+ * Session listing uses CHROTE API (terminal backend) when available.
+ * Pane capture uses local TmuxBridge.
  */
 
 import { EventEmitter } from "events";
 import type { TmuxBridge } from "./bridge";
+import type { ChroteClient } from "../chrote";
 import type { TmuxSession, TmuxEvent } from "./types";
 
 /** Default polling interval: 200ms = 5 FPS */
@@ -29,6 +33,7 @@ interface PollerOptions {
 
 export class TmuxPoller extends EventEmitter {
   private bridge: TmuxBridge;
+  private chrote: ChroteClient | null;
   private pollInterval: number;
   private sessionListInterval: number;
 
@@ -48,9 +53,10 @@ export class TmuxPoller extends EventEmitter {
   /** Running state */
   private running = false;
 
-  constructor(bridge: TmuxBridge, options: PollerOptions = {}) {
+  constructor(bridge: TmuxBridge, chrote?: ChroteClient, options: PollerOptions = {}) {
     super();
     this.bridge = bridge;
+    this.chrote = chrote ?? null;
     this.pollInterval = options.pollInterval ?? DEFAULT_POLL_INTERVAL;
     this.sessionListInterval = options.sessionListInterval ?? SESSION_LIST_INTERVAL;
   }
@@ -208,10 +214,14 @@ export class TmuxPoller extends EventEmitter {
 
   /**
    * Poll session list for creation/destruction
+   * Uses CHROTE API if available, falls back to local bridge
    */
   private async pollSessions(): Promise<void> {
     try {
-      const sessions = await this.bridge.listSessions();
+      // Prefer CHROTE API for session listing
+      const sessions = this.chrote
+        ? await this.chrote.listSessions()
+        : await this.bridge.listSessions();
       const currentSessionNames = new Set(sessions.map((s) => s.name));
 
       // Detect new sessions
@@ -299,10 +309,15 @@ export class TmuxPoller extends EventEmitter {
 
 /**
  * Create a new poller instance
+ *
+ * @param bridge - TmuxBridge for pane capture
+ * @param chrote - ChroteClient for session listing (optional)
+ * @param options - Polling configuration
  */
 export function createTmuxPoller(
   bridge: TmuxBridge,
+  chrote?: ChroteClient,
   options?: PollerOptions
 ): TmuxPoller {
-  return new TmuxPoller(bridge, options);
+  return new TmuxPoller(bridge, chrote, options);
 }

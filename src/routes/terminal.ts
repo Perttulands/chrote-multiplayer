@@ -3,11 +3,15 @@
  *
  * HTTP endpoints for terminal session management.
  * WebSocket handles real-time streaming; these are for REST operations.
+ *
+ * Session listing uses CHROTE API (terminal backend).
+ * Other operations (capture, sendKeys) use local TmuxBridge until CHROTE exposes them.
  */
 
 import { Hono } from "hono";
 import { validateSession } from "../lib/session";
 import { getTmuxBridge } from "../server/tmux";
+import { getChroteClient } from "../server/chrote";
 import { ROLE_HIERARCHY, type Role } from "../db/schema";
 import type { TerminalWSServer } from "../server/ws";
 
@@ -34,18 +38,18 @@ terminal.use("*", async (c, next) => {
   return next();
 });
 
-// === List Sessions ===
+// === List Sessions (via CHROTE API) ===
 
 terminal.get("/sessions", async (c) => {
-  const bridge = getTmuxBridge();
+  const chrote = getChroteClient();
 
   try {
-    const available = await bridge.isAvailable();
+    const available = await chrote.isAvailable();
     if (!available) {
-      return c.json({ error: "tmux not available" }, 503);
+      return c.json({ error: "CHROTE API not available" }, 503);
     }
 
-    const sessions = await bridge.listSessions();
+    const sessions = await chrote.listSessions();
     return c.json({ sessions });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to list sessions";
@@ -161,26 +165,39 @@ terminal.post("/sessions/:name/keys", async (c) => {
   }
 });
 
-// === Check tmux availability ===
+// === Check availability ===
 
 terminal.get("/status", async (c) => {
+  const chrote = getChroteClient();
   const bridge = getTmuxBridge();
 
   try {
-    const available = await bridge.isAvailable();
-    const sessions = available ? await bridge.listSessions() : [];
+    // Check both CHROTE API and local tmux (for operations not yet in CHROTE)
+    const [chroteAvailable, tmuxAvailable] = await Promise.all([
+      chrote.isAvailable(),
+      bridge.isAvailable(),
+    ]);
+
+    const sessions = chroteAvailable ? await chrote.listSessions() : [];
 
     return c.json({
-      tmux: {
-        available,
+      chrote: {
+        available: chroteAvailable,
         sessionCount: sessions.length,
+      },
+      tmux: {
+        available: tmuxAvailable,
+        note: "Used for capture/sendKeys until CHROTE exposes these",
       },
     });
   } catch (err) {
     return c.json({
-      tmux: {
+      chrote: {
         available: false,
         error: err instanceof Error ? err.message : "Unknown error",
+      },
+      tmux: {
+        available: false,
       },
     });
   }

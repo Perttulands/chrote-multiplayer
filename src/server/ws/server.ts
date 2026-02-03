@@ -3,6 +3,9 @@
  *
  * Real-time terminal streaming and presence management.
  * Handles authentication, subscriptions, and message routing.
+ *
+ * Session listing uses CHROTE API (terminal backend).
+ * Other operations (capture, sendKeys) use local TmuxBridge until CHROTE exposes them.
  */
 
 import { nanoid } from "nanoid";
@@ -17,6 +20,7 @@ import type {
 } from "./types";
 import { ErrorCodes } from "./types";
 import { TmuxBridge, TmuxPoller, getTmuxBridge, createTmuxPoller } from "../tmux";
+import { ChroteClient, getChroteClient } from "../chrote";
 import type { TmuxSession, TmuxEvent } from "../tmux/types";
 import { ROLE_HIERARCHY, type Role } from "../../db/schema";
 
@@ -27,8 +31,10 @@ const HEARTBEAT_TIMEOUT_MS = 30 * 1000;
 const HEARTBEAT_CHECK_INTERVAL = 10 * 1000;
 
 export interface WSServerOptions {
-  /** Custom tmux bridge (for testing) */
+  /** Custom tmux bridge (for testing, used for capture/sendKeys) */
   bridge?: TmuxBridge;
+  /** Custom CHROTE client (for testing, used for session listing) */
+  chrote?: ChroteClient;
   /** Authentication function: returns user info or null */
   authenticate: (
     request: Request
@@ -42,6 +48,7 @@ interface WebSocketWithState {
 
 export class TerminalWSServer {
   private bridge: TmuxBridge;
+  private chrote: ChroteClient;
   private poller: TmuxPoller;
   private authenticate: WSServerOptions["authenticate"];
 
@@ -59,7 +66,8 @@ export class TerminalWSServer {
 
   constructor(options: WSServerOptions) {
     this.bridge = options.bridge ?? getTmuxBridge();
-    this.poller = createTmuxPoller(this.bridge);
+    this.chrote = options.chrote ?? getChroteClient();
+    this.poller = createTmuxPoller(this.bridge, this.chrote);
     this.authenticate = options.authenticate;
 
     // Wire up poller events
@@ -146,8 +154,8 @@ export class TerminalWSServer {
       role: auth.role,
     });
 
-    // Send current sessions list
-    const sessions = await this.bridge.listSessions();
+    // Send current sessions list (via CHROTE API)
+    const sessions = await this.chrote.listSessions();
     this.send(ws, { type: "sessions", sessions });
 
     console.log(`[WS] Client connected: ${clientId} (user: ${auth.userName})`);
@@ -214,7 +222,7 @@ export class TerminalWSServer {
           break;
 
         case "listSessions":
-          const sessions = await this.bridge.listSessions();
+          const sessions = await this.chrote.listSessions();
           this.send(ws, { type: "sessions", sessions });
           break;
 
