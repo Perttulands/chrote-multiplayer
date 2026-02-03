@@ -14,10 +14,8 @@ import {
   BaseBoxShapeUtil,
   HTMLContainer,
   TLBaseShape,
-  TLResizeInfo,
-  resizeBox,
 } from 'tldraw'
-import { useEffect, useRef, useCallback, useState, memo } from 'react'
+import { useEffect, useRef, useCallback, memo } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -332,8 +330,8 @@ export class TerminalShapeUtil extends BaseBoxShapeUtil<TerminalShape> {
     )
   }
 
-  // Handle resize (fixed size, but still need the handler)
-  override onResize(shape: TerminalShape, info: TLResizeInfo<TerminalShape>) {
+  // Handle resize (fixed size, returns unchanged)
+  override onResize = () => {
     // Keep fixed size
     return {
       props: {
@@ -352,18 +350,18 @@ export class TerminalShapeUtil extends BaseBoxShapeUtil<TerminalShape> {
   }
 
   // Helpers (to be implemented with actual WebSocket/store connection)
-  private getCurrentUserId(): string | null {
+  protected getCurrentUserId(): string | null {
     // TODO: Get from auth store
     return null
   }
 
-  private claimSession(shapeId: string, sessionId: string) {
+  protected claimSession(_shapeId: string, sessionId: string) {
     // TODO: Send claim message via WebSocket
     // Then update shape props via editor.updateShape
     console.log('Claiming session:', sessionId)
   }
 
-  private releaseSession(shapeId: string, sessionId: string) {
+  protected releaseSession(_shapeId: string, sessionId: string) {
     // TODO: Send release message via WebSocket
     // Then update shape props via editor.updateShape
     console.log('Releasing session:', sessionId)

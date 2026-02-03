@@ -18,26 +18,6 @@ function PresenceDot({ status }: { status: PresenceStatus }) {
   )
 }
 
-function Avatar({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
-  const initials = name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className="w-8 h-8 rounded-full object-cover"
-      />
-    )
-  }
-
-  return <div className="avatar">{initials}</div>
-}
-
 function SessionCard({ session, isActive, onClick }: {
   session: Session
   isActive: boolean

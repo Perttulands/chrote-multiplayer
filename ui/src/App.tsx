@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Header, Sidebar, TerminalView } from '@/components'
+import { Header, Sidebar, Canvas } from '@/components'
 import { useSessionStore } from '@/stores/session'
 import type { Session, User } from '@/types'
 
@@ -108,9 +108,7 @@ function App() {
   const {
     user,
     setUser,
-    sessions,
     setSessions,
-    activeSessionId,
     setActiveSession,
     setConnected,
   } = useSessionStore()
@@ -126,8 +124,6 @@ function App() {
       setActiveSession(DEMO_SESSIONS[0].id)
     }
   }, [setUser, setSessions, setConnected, setActiveSession])
-
-  const activeSession = sessions.find((s) => s.id === activeSessionId) || null
 
   const handleLogout = () => {
     setUser(null)
@@ -146,9 +142,9 @@ function App() {
         {/* Sidebar */}
         <Sidebar />
 
-        {/* Terminal view */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          <TerminalView session={activeSession} />
+        {/* Canvas - infinite whiteboard */}
+        <main className="flex-1 overflow-hidden relative">
+          <Canvas />
         </main>
       </div>
     </div>

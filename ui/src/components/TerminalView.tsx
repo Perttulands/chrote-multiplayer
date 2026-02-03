@@ -1,6 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { Terminal, useTerminalRef } from './Terminal'
-import { useSessionStore } from '@/stores/session'
 import type { Session, Participant } from '@/types'
 
 interface TerminalViewProps {
