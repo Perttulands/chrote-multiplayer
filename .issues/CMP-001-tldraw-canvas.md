@@ -3,7 +3,7 @@ id: CMP-001
 title: tldraw Canvas Foundation
 type: feature
 priority: p0
-status: open
+status: done
 ---
 
 # tldraw Canvas Foundation
@@ -12,12 +12,12 @@ Set up tldraw as the infinite canvas foundation.
 
 ## Tasks
 
-- [ ] Install tldraw and dependencies
-- [ ] Create basic canvas component with pan/zoom
-- [ ] Add sidebar layout (sessions list placeholder + canvas area)
-- [ ] Configure tldraw for collaboration (Yjs store)
-- [ ] Test basic shapes work (rectangles, sticky notes, arrows)
-- [ ] Add minimap component
+- [x] Install tldraw and dependencies
+- [x] Create basic canvas component with pan/zoom
+- [x] Add sidebar layout (sessions list placeholder + canvas area)
+- [x] Configure tldraw for collaboration (Yjs store)
+- [x] Test basic shapes work (rectangles, sticky notes, arrows)
+- [x] Add minimap component
 
 ## Acceptance Criteria
 
