@@ -51,12 +51,17 @@ class TerminalShapeUtil extends BaseBoxShapeUtil<TerminalShape> {
 ```
 
 ## Acceptance Criteria
-- [ ] Terminal renders at 80x24 fixed size
-- [ ] WebSocket connects and streams output
-- [ ] Click claims lock (if available)
-- [ ] Keyboard input works when locked
-- [ ] Lock badge shows owner
-- [ ] Release works via button/click-away
+- [x] Terminal renders at 80x24 fixed size
+- [x] WebSocket connects and streams output
+- [x] Click claims lock (if available)
+- [x] Keyboard input works when locked
+- [x] Lock badge shows owner
+- [x] Release works via button/click-away
+
+## Status: COMPLETE ✅
+Implemented in commits:
+- 7694d60: TerminalShape.tsx with xterm.js integration
+- 6eae540: Canvas.tsx with ConnectedTerminalShapeUtil wiring
 
 ## Dependencies
 - CMP-001: tldraw canvas setup
