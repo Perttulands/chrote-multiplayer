@@ -33,6 +33,7 @@
     "oslo": "^1.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.41.0",
     "@types/better-sqlite3": "^7.6.9",
     "@types/bun": "^1.0.0",
     "drizzle-kit": "^0.20.0",
