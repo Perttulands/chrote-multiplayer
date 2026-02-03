@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+  * {
+    @apply border-terminal-border;
+  }
+
+  body {
+    @apply bg-terminal-bg min-h-screen;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-terminal-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+}
+
+/* xterm.js customizations */
+@layer components {
+  .xterm-viewport {
+    @apply !overflow-hidden;
+  }
+
+  .xterm-screen {
+    @apply !overflow-hidden;
+  }
+
+  /* Terminal container */
+  .terminal-container {
+    @apply w-full h-full bg-terminal-bg rounded-lg overflow-hidden;
+  }
+
+  /* Session card */
+  .session-card {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer
+           transition-colors duration-150
+           hover:bg-terminal-hover;
+  }
+
+  .session-card.active {
+    @apply bg-terminal-hover border-l-2 border-accent-primary;
+  }
+
+  /* User avatar */
+  .avatar {
+    @apply w-8 h-8 rounded-full bg-terminal-surface flex items-center justify-center
+           text-sm font-medium text-gray-400 uppercase;
+  }
+
+  .avatar-online::after {
+    content: '';
+    @apply absolute bottom-0 right-0 w-2.5 h-2.5 bg-accent-success rounded-full
+           border-2 border-terminal-bg;
+  }
+
+  /* Presence dot */
+  .presence-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .presence-dot.online {
+    @apply bg-accent-success animate-pulse-slow;
+  }
+
+  .presence-dot.idle {
+    @apply bg-accent-warning;
+  }
+
+  .presence-dot.offline {
+    @apply bg-gray-500;
+  }
+}
+
+/* Utility classes */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+}
