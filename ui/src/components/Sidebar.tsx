@@ -1,10 +1,13 @@
 import { useEffect } from 'react'
 import { SessionList } from './SessionList'
 import { useSessionStore } from '@/stores/session'
+import { useAuthStore } from '@/stores/auth'
 import { useSessionAwareness } from '@/hooks/useSessionAwareness'
 
 export function Sidebar() {
-  const { sessions, user, activeSessionId } = useSessionStore()
+  const { sessions, activeSessionId } = useSessionStore()
+  const { getUIUser } = useAuthStore()
+  const user = getUIUser()
 
   // Real-time session awareness for presence indicators
   const {

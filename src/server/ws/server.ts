@@ -46,6 +46,9 @@ interface WebSocketWithState {
   state: ClientState;
 }
 
+// Reverse mapping from WebSocket to clientId (for Bun's event model)
+const wsToClientId = new WeakMap<WebSocket, string>();
+
 export class TerminalWSServer {
   private bridge: TmuxBridge;
   private chrote: ChroteClient;
@@ -141,6 +144,9 @@ export class TerminalWSServer {
 
     this.clients.set(clientId, { ws, state });
 
+    // Store reverse mapping for Bun's event model
+    wsToClientId.set(ws, clientId);
+
     // Track user -> clients mapping
     if (!this.userClients.has(auth.userId)) {
       this.userClients.set(auth.userId, new Set());
@@ -160,19 +166,34 @@ export class TerminalWSServer {
 
     console.log(`[WS] Client connected: ${clientId} (user: ${auth.userName})`);
 
-    // Set up message handler
-    ws.addEventListener("message", (event) => {
-      this.handleMessage(clientId, event.data as string);
-    });
+    // Note: In Bun, message/close events are handled via the server's
+    // websocket handlers which call handleWsMessage/handleWsClose
+  }
 
-    // Set up close handler
-    ws.addEventListener("close", () => {
-      this.handleDisconnect(clientId);
-    });
+  /**
+   * Handle WebSocket message (called from Bun's websocket.message handler)
+   */
+  handleWsMessage(ws: WebSocket, message: string | Buffer): void {
+    const clientId = wsToClientId.get(ws);
+    if (!clientId) {
+      console.error("[WS] Message from unknown WebSocket");
+      return;
+    }
+    const rawMessage = typeof message === "string" ? message : message.toString();
+    this.handleMessage(clientId, rawMessage);
+  }
 
-    ws.addEventListener("error", (event) => {
-      console.error(`[WS] Client error: ${clientId}`, event);
-    });
+  /**
+   * Handle WebSocket close (called from Bun's websocket.close handler)
+   */
+  handleWsClose(ws: WebSocket): void {
+    const clientId = wsToClientId.get(ws);
+    if (!clientId) {
+      // This happens for unauthenticated connections - not an error
+      return;
+    }
+    wsToClientId.delete(ws);
+    this.handleDisconnect(clientId);
   }
 
   /**
@@ -570,7 +591,8 @@ export class TerminalWSServer {
    * Send message to a single client
    */
   private send(ws: WebSocket, message: ServerMessage): void {
-    if (ws.readyState === WebSocket.OPEN) {
+    // Use readyState === 1 (OPEN) for compatibility with Bun's ServerWebSocket
+    if (ws.readyState === 1) {
       ws.send(JSON.stringify(message));
     }
   }

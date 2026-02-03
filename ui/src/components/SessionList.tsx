@@ -2,6 +2,7 @@ import { clsx } from 'clsx'
 import type { Session, UserRole } from '@/types'
 import type { AwarenessUser } from '@/hooks/useYjsCollaboration'
 import { useSessionStore } from '@/stores/session'
+import { useAuthStore } from '@/stores/auth'
 import { PresenceAvatarStack } from './PresenceAvatarStack'
 import { ClaimControls } from './ClaimControls'
 
@@ -120,7 +121,9 @@ function SessionCard({
 }
 
 export function SessionList({ sessions, sessionAwareness }: SessionListProps) {
-  const { activeSessionId, setActiveSession, user } = useSessionStore()
+  const { activeSessionId, setActiveSession } = useSessionStore()
+  const { getUIUser } = useAuthStore()
+  const user = getUIUser()
 
   // Default to operator role if not set (demo mode)
   const userId = user?.id || 'anonymous'

@@ -1,5 +1,6 @@
 export { Header } from './Header'
 export { Sidebar } from './Sidebar'
+export { LoginPage } from './LoginPage'
 export { InvitePanel } from './InvitePanel'
 export { UserManagementPanel } from './UserManagementPanel'
 export { SessionList } from './SessionList'

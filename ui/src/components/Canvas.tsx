@@ -9,7 +9,7 @@ import { Tldraw, track, useEditor, TLComponents, createShapeId, Editor } from 't
 import 'tldraw/tldraw.css'
 import { useMemo, useEffect, useCallback, createContext, useContext, useState, useRef } from 'react'
 import { TerminalShapeUtil, TERMINAL_WIDTH, TERMINAL_HEIGHT, type TerminalShape } from '../shapes'
-import { useSessionStore } from '../stores/session'
+import { useAuthStore } from '../stores/auth'
 
 // Drag data type
 interface SessionDragData {
@@ -176,7 +176,8 @@ export interface CanvasProps {
  * Main Canvas component with tldraw and terminal shapes.
  */
 export function Canvas({ className }: CanvasProps) {
-  const user = useSessionStore((s) => s.user)
+  const { getUIUser } = useAuthStore()
+  const user = getUIUser()
   const editorRef = useRef<Editor | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
 

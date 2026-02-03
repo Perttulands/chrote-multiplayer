@@ -1,187 +1,92 @@
 import { useEffect } from 'react'
-import { Header, Sidebar, Canvas } from '@/components'
+import { Header, Sidebar, Canvas, LoginPage } from '@/components'
 import { useSessionStore } from '@/stores/session'
-import type { Session, User } from '@/types'
+import { useAuthStore } from '@/stores/auth'
+import type { Session } from '@/types'
 
-// Demo data for development
-const DEMO_USER: User = {
-  id: 'user-1',
-  name: 'Perttu Lähteenlahti',
-  email: 'perttu@chrote.cloud',
-  avatarUrl: undefined,
-  role: 'operator', // Default to operator for testing claim controls
-}
-
+// Demo sessions for fallback when API is unavailable
 const DEMO_SESSIONS: Session[] = [
   {
     id: 'session-1',
     name: 'Dev Environment',
-    hostId: 'user-1',
+    hostId: 'system',
     tmuxSession: 'chrote-dev',
     createdAt: new Date(),
     status: 'active',
-    participants: [
-      {
-        userId: 'user-1',
-        user: DEMO_USER,
-        role: 'host',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-      {
-        userId: 'user-2',
-        user: {
-          id: 'user-2',
-          name: 'Demo Viewer',
-          email: 'viewer@demo.com',
-        },
-        role: 'viewer',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-    ],
+    participants: [],
   },
   {
     id: 'session-2',
     name: 'Production Server',
-    hostId: 'user-1',
+    hostId: 'system',
     tmuxSession: 'chrote-prod',
     createdAt: new Date(),
     status: 'paused',
-    participants: [
-      {
-        userId: 'user-1',
-        user: DEMO_USER,
-        role: 'host',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-    ],
-  },
-  {
-    id: 'session-3',
-    name: 'Pair Programming',
-    hostId: 'user-3',
-    tmuxSession: 'pair-session',
-    createdAt: new Date(),
-    status: 'active',
-    participants: [
-      {
-        userId: 'user-3',
-        user: {
-          id: 'user-3',
-          name: 'Alice Dev',
-          email: 'alice@dev.com',
-        },
-        role: 'host',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-      {
-        userId: 'user-1',
-        user: DEMO_USER,
-        role: 'controller',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-      {
-        userId: 'user-4',
-        user: {
-          id: 'user-4',
-          name: 'Bob Helper',
-          email: 'bob@help.com',
-        },
-        role: 'viewer',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-      {
-        userId: 'user-5',
-        user: {
-          id: 'user-5',
-          name: 'Carol Tech',
-          email: 'carol@tech.com',
-        },
-        role: 'viewer',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-      {
-        userId: 'user-6',
-        user: {
-          id: 'user-6',
-          name: 'Dan Smith',
-          email: 'dan@smith.com',
-        },
-        role: 'viewer',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-      {
-        userId: 'user-7',
-        user: {
-          id: 'user-7',
-          name: 'Eve Johnson',
-          email: 'eve@johnson.com',
-        },
-        role: 'viewer',
-        joinedAt: new Date(),
-        lastSeen: new Date(),
-        isOnline: true,
-      },
-    ],
+    participants: [],
   },
 ]
 
 function App() {
-  const {
-    user,
-    setUser,
-    setSessions,
-    setActiveSession,
-    setConnected,
-    fetchSessions,
-  } = useSessionStore()
+  const { setSessions, setConnected, fetchSessions } = useSessionStore()
+  const { user, isLoading, isInitialized, checkAuth, logout, getUIUser } = useAuthStore()
 
-  // Initialize user and fetch sessions from CHROTE API
+  // Check authentication on mount
   useEffect(() => {
-    setUser(DEMO_USER)
+    checkAuth()
+  }, [checkAuth])
 
-    // Try to fetch from CHROTE API, fall back to demo data
-    fetchSessions().catch(() => {
-      // Fallback to demo data if API unavailable
-      setSessions(DEMO_SESSIONS)
-      setConnected(true)
-    })
-  }, [setUser, fetchSessions, setSessions, setConnected])
-
-  // Refresh sessions periodically
+  // Fetch sessions when authenticated
   useEffect(() => {
+    if (user) {
+      fetchSessions().catch(() => {
+        // Fallback to demo data if API unavailable
+        setSessions(DEMO_SESSIONS)
+        setConnected(true)
+      })
+    }
+  }, [user, fetchSessions, setSessions, setConnected])
+
+  // Refresh sessions periodically when authenticated
+  useEffect(() => {
+    if (!user) return
+
     const interval = setInterval(() => {
       fetchSessions().catch(() => {})
     }, 10000) // Refresh every 10 seconds
-    return () => clearInterval(interval)
-  }, [fetchSessions])
 
-  const handleLogout = () => {
-    setUser(null)
+    return () => clearInterval(interval)
+  }, [user, fetchSessions])
+
+  const handleLogout = async () => {
+    await logout()
     setSessions([])
-    setActiveSession(null)
     setConnected(false)
   }
+
+  // Show loading spinner while checking auth
+  if (!isInitialized || isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-terminal-bg">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-primary" />
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show login page if not authenticated
+  if (!user) {
+    return <LoginPage />
+  }
+
+  // Get user in UI format
+  const uiUser = getUIUser()
 
   return (
     <div className="h-screen flex flex-col bg-terminal-bg">
       {/* Header */}
-      <Header user={user} onLogout={handleLogout} />
+      <Header user={uiUser} onLogout={handleLogout} />
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useUsersStore, type ManagedUser } from '@/stores/users'
-import { useSessionStore } from '@/stores/session'
+import { useAuthStore } from '@/stores/auth'
 import type { UserRole } from '@/types'
 
 interface UserManagementPanelProps {
@@ -10,7 +10,7 @@ interface UserManagementPanelProps {
 
 export function UserManagementPanel({ isOpen, onClose }: UserManagementPanelProps) {
   const { users, isLoading, error, fetchUsers, updateUserRole, removeUser } = useUsersStore()
-  const { user: currentUser } = useSessionStore()
+  const { user: currentUser } = useAuthStore()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)

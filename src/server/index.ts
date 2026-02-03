@@ -153,22 +153,58 @@ process.on("SIGTERM", async () => {
   process.exit(0);
 });
 
+// Type for WebSocket with attached data
+interface WSData {
+  request: Request;
+}
+
+// Export wsServer for other modules
+export { wsServer };
+
+// Export Bun server configuration (Bun will call Bun.serve() with this)
 export default {
   port,
-  fetch: app.fetch,
-  // Bun WebSocket handler
+  // Custom fetch handler that handles WebSocket upgrades
+  fetch(request: Request, server: { upgrade: (req: Request, opts?: { data?: WSData }) => boolean; requestIP: (req: Request) => { address: string } | null }) {
+    const url = new URL(request.url);
+
+    // Handle WebSocket upgrade on /ws path
+    if (url.pathname === "/ws") {
+      // Check for WebSocket upgrade header
+      const upgradeHeader = request.headers.get("Upgrade");
+      if (upgradeHeader?.toLowerCase() === "websocket") {
+        // Upgrade the connection, storing the request for authentication
+        const success = server.upgrade(request, {
+          data: { request },
+        });
+        if (success) {
+          // Bun handles the upgrade response
+          return undefined;
+        }
+        return new Response("WebSocket upgrade failed", { status: 500 });
+      }
+    }
+
+    // For all other requests, use the Hono app
+    return app.fetch(request, { ip: server.requestIP(request) });
+  },
+  // WebSocket handlers
   websocket: {
-    open(ws: WebSocket) {
-      // Connection opened - actual handling done in upgrade
+    async open(ws: { data: WSData }) {
+      // Get the original request from upgrade data
+      const data = ws.data;
+      console.log("[WS] Connection opened, authenticating...");
+
+      // Pass to the terminal WebSocket server
+      await wsServer.handleConnection(ws as unknown as WebSocket, data.request);
     },
-    message(ws: WebSocket, message: string | Buffer) {
-      // Messages handled by the wsServer via addEventListener
+    message(ws: unknown, message: string | Buffer) {
+      // Route message to the terminal WebSocket server
+      wsServer.handleWsMessage(ws as WebSocket, message);
     },
-    close(ws: WebSocket) {
-      // Cleanup handled by the wsServer via addEventListener
+    close(ws: unknown) {
+      // Route close event to the terminal WebSocket server
+      wsServer.handleWsClose(ws as WebSocket);
     },
   },
 };
-
-// Export for WebSocket upgrade handling
-export { wsServer };
