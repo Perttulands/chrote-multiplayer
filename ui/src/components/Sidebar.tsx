@@ -25,7 +25,7 @@ export function Sidebar() {
   }, [activeSessionId, awarenessConnected, setCurrentSessionId])
 
   return (
-    <aside className="w-64 h-full flex flex-col border-r border-terminal-border bg-terminal-surface/30">
+    <aside className="w-64 h-full flex flex-col border-r border-terminal-border bg-terminal-surface/30 relative z-10">
       {/* Header */}
       <div className="p-4 border-b border-terminal-border">
         <div className="flex items-center justify-between mb-3">

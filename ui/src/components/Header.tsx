@@ -71,13 +71,13 @@ export function Header({ user, onLogout }: HeaderProps) {
   const [showUserPanel, setShowUserPanel] = useState(false)
 
   return (
-    <header className="h-14 px-4 flex items-center justify-between border-b border-terminal-border bg-terminal-surface/50 backdrop-blur-sm">
-      {/* Invite Panel Modal */}
+    <>
+      {/* Modals rendered outside header stacking context for proper z-index */}
       <InvitePanel isOpen={showInvitePanel} onClose={() => setShowInvitePanel(false)} />
-      {/* User Management Panel Modal */}
       <UserManagementPanel isOpen={showUserPanel} onClose={() => setShowUserPanel(false)} />
 
-      {/* Logo and connection status */}
+      <header className="h-14 px-4 flex items-center justify-between border-b border-terminal-border bg-terminal-surface/50 backdrop-blur-sm relative z-20">
+        {/* Logo and connection status */}
       <div className="flex items-center gap-3">
         {/* Logo */}
         <div className="flex items-center gap-2">
@@ -159,5 +159,6 @@ export function Header({ user, onLogout }: HeaderProps) {
         )}
       </div>
     </header>
+    </>
   )
 }

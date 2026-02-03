@@ -189,7 +189,7 @@ function App() {
         <Sidebar />
 
         {/* Canvas - infinite whiteboard */}
-        <main className="flex-1 overflow-hidden relative">
+        <main className="flex-1 overflow-hidden relative z-0">
           <Canvas />
         </main>
       </div>
