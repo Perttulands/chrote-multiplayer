@@ -15,6 +15,7 @@ import invitesRoutes from "../routes/invites";
 import terminalRoutes from "../routes/terminal";
 import usersRoutes from "../routes/users";
 import { createWSServer, authenticateWSConnection } from "./ws";
+import { getHocuspocusServer } from "./yjs";
 
 const app = new Hono();
 
@@ -109,6 +110,24 @@ app.get("/api/ws/stats", (c) => {
   return c.json(wsServer.getStats());
 });
 
+// === Hocuspocus (Yjs) Server ===
+
+const hocuspocus = getHocuspocusServer();
+const yjsPort = parseInt(process.env.YJS_PORT || "3001");
+
+// Start Hocuspocus on separate port for Yjs collaboration
+hocuspocus.listen(yjsPort).then(() => {
+  console.log(`🔄 Yjs collaboration server running on port ${yjsPort}`);
+});
+
+// Yjs stats endpoint
+app.get("/api/yjs/stats", (c) => {
+  return c.json({
+    connections: hocuspocus.getConnectionsCount(),
+    documents: hocuspocus.getDocumentsCount(),
+  });
+});
+
 // === Start Server ===
 
 const port = parseInt(process.env.PORT || "3000");
@@ -117,15 +136,17 @@ console.log(`🚀 CHROTE Multiplayer server starting on port ${port}`);
 console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
 
 // Cleanup on shutdown
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
   console.log("\n🛑 Shutting down...");
   wsServer.stop();
+  await hocuspocus.destroy();
   process.exit(0);
 });
 
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   console.log("\n🛑 Shutting down...");
   wsServer.stop();
+  await hocuspocus.destroy();
   process.exit(0);
 });
 

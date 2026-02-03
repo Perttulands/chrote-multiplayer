@@ -322,14 +322,16 @@ interface FindOrCreateUserParams {
   pendingInvite?: string;
 }
 
-interface FindOrCreateUserResult {
-  success: true;
-  user: typeof users.$inferSelect;
-  created: boolean;
-} | {
-  success: false;
-  error: string;
-}
+type FindOrCreateUserResult =
+  | {
+      success: true;
+      user: typeof users.$inferSelect;
+      created: boolean;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 async function findOrCreateUser(
   params: FindOrCreateUserParams

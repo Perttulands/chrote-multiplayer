@@ -1,48 +1,63 @@
----
-id: CMP-003
-title: Custom Terminal Shape
-type: feature
-priority: p0
-status: open
----
+# CMP-003: Terminal Shape for tldraw Canvas
 
-# Custom Terminal Shape
+## Summary
+Create custom tldraw shape that renders xterm.js terminal with WebSocket streaming and lock state.
 
-Create tldraw custom shape that renders xterm.js terminal.
+## Requirements
 
-## Tasks
+### Shape Properties
+- `sessionId: string` - tmux session to connect to
+- `lockedBy: string | null` - user ID who has control (null = available)
+- Fixed size: 80 columns x 24 rows (standard terminal)
 
-- [ ] Create TerminalShape class extending tldraw BaseBoxShapeUtil
-- [ ] Embed xterm.js inside shape (fixed 80x24)
-- [ ] Connect to existing WebSocket terminal stream
-- [ ] Add lock state to shape props (lockedBy: userId | null)
-- [ ] Render lock indicator (border color, avatar badge)
-- [ ] Handle focus: locked by me = can type, otherwise read-only
-- [ ] Style terminal to look good on canvas
+### Visual States
+- **Unlocked**: Neutral border, "Available" badge
+- **Locked by me**: Accent border, full keyboard input
+- **Locked by other**: Muted style, locked badge with avatar
 
-## Acceptance Criteria
+### Behavior
+- Click shape to claim (if unlocked)
+- Keyboard input only when you have lock
+- Release button or click-away to release
+- Real-time terminal output via WebSocket
 
-- Can add Terminal shape to canvas
-- Terminal shows live tmux output
-- Lock state visible (who owns it)
-- Can type when locked by self
-- Can't type when locked by others or unlocked
+### Integration Points
+- WebSocket: `subscribe`, `unsubscribe`, `sendKeys` messages
+- Lock: `claim`, `release` messages
+- Output: Handle `output` messages to xterm
 
-## Technical Notes
+## Technical Design
 
 ```tsx
-// Shape props
-{
-  sessionId: string,      // tmux session name
-  lockedBy: string | null // user id or null
+// Shape definition
+interface TerminalShapeProps {
+  w: number          // Fixed width
+  h: number          // Fixed height
+  sessionId: string
+  lockedBy: string | null
+}
+
+// Shape extends BaseBoxShapeUtil
+class TerminalShapeUtil extends BaseBoxShapeUtil<TerminalShape> {
+  // Fixed size - no resize
+  canResize = () => false
+
+  // Render xterm + lock overlay
+  component(shape) { ... }
+
+  // Handle lock on pointer down
+  onDoubleClick(shape) { ... }
 }
 ```
 
-- Use existing WebSocket at /ws/terminal/:sessionId
-- Fixed size = no resize handling needed
-- See docs/PRD.md for full spec
+## Acceptance Criteria
+- [ ] Terminal renders at 80x24 fixed size
+- [ ] WebSocket connects and streams output
+- [ ] Click claims lock (if available)
+- [ ] Keyboard input works when locked
+- [ ] Lock badge shows owner
+- [ ] Release works via button/click-away
 
 ## Dependencies
-
-- CMP-001 (canvas foundation)
-- Existing terminal WebSocket code
+- CMP-001: tldraw canvas setup
+- CMP-002: Yjs sync layer

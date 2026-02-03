@@ -26,14 +26,16 @@
     "db:studio": "bunx drizzle-kit studio"
   },
   "dependencies": {
-    "hono": "^4.0.0",
+    "@hocuspocus/server": "^3.4.4",
     "@hono/node-server": "^1.8.0",
+    "arctic": "^2.0.0",
     "better-sqlite3": "^9.4.0",
     "drizzle-orm": "^0.29.0",
+    "hono": "^4.0.0",
     "nanoid": "^5.0.0",
-    "zod": "^3.22.0",
-    "arctic": "^2.0.0",
-    "oslo": "^1.0.0"
+    "oslo": "^1.0.0",
+    "yjs": "^13.6.29",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.41.0",
