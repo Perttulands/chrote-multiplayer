@@ -29,8 +29,11 @@ logs/
 npm-debug.log*
 
 # Database
+data/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # bv (beads viewer) local config and caches
 .bv/

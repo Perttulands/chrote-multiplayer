@@ -1,0 +1,21 @@
+# CHROTE Multiplayer - Development Dockerfile
+FROM oven/bun:1
+
+WORKDIR /app
+
+# Install tmux for session management
+RUN apt-get update && apt-get install -y tmux && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package.json bun.lockb* ./
+RUN bun install
+
+# Copy UI package files and install
+COPY ui/package.json ui/bun.lockb* ./ui/
+RUN cd ui && bun install
+
+# Copy source (will be overwritten by volume mount)
+COPY . .
+
+EXPOSE 3000 5173
+CMD ["bun", "run", "dev"]

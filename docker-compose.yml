@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ./data:/app/data
+      - /tmp/chrote-tmux:/tmp/chrote-tmux
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - DATABASE_PATH=/app/data/chrote.db
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - TMUX_SOCKET_DIR=/tmp/chrote-tmux
+    restart: unless-stopped
+
+  # Development: hot reload
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "${PORT:-3000}:3000"
+      - "5173:5173" # Vite dev server
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/ui/node_modules
+      - ./data:/app/data
+      - /tmp/chrote-tmux:/tmp/chrote-tmux
+    environment:
+      - NODE_ENV=development
+      - DATABASE_PATH=/app/data/chrote.db
+      - TMUX_SOCKET_DIR=/tmp/chrote-tmux
+    command: bun run dev
