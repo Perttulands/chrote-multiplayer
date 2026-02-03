@@ -13,6 +13,7 @@ import { secureHeaders } from "hono/secure-headers";
 import authRoutes from "../routes/auth";
 import invitesRoutes from "../routes/invites";
 import terminalRoutes from "../routes/terminal";
+import usersRoutes from "../routes/users";
 import { createWSServer, authenticateWSConnection } from "./ws";
 
 const app = new Hono();
@@ -60,6 +61,7 @@ app.get("/api/health", (c) => {
 app.route("/api/auth", authRoutes);
 app.route("/api/invites", invitesRoutes);
 app.route("/api/terminal", terminalRoutes);
+app.route("/api/users", usersRoutes);
 
 // API info
 app.get("/api", (c) => {
@@ -69,6 +71,7 @@ app.get("/api", (c) => {
     endpoints: {
       auth: "/api/auth",
       invites: "/api/invites",
+      users: "/api/users",
     },
   });
 });
