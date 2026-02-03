@@ -101,7 +101,7 @@ export const useLocksStore = create<LocksState>((set, get) => ({
   },
 
   claimSession: async (sessionId, userId, userName) => {
-    const { locks, loading } = get()
+    const { loading } = get()
 
     // Prevent double-clicks
     if (loading.get(sessionId)) return false

@@ -9,6 +9,7 @@ const DEMO_USER: User = {
   name: 'Perttu Lähteenlahti',
   email: 'perttu@chrote.cloud',
   avatarUrl: undefined,
+  role: 'operator', // Default to operator for testing claim controls
 }
 
 const DEMO_SESSIONS: Session[] = [

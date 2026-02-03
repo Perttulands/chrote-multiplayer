@@ -1,8 +1,9 @@
 import { clsx } from 'clsx'
-import type { Session } from '@/types'
+import type { Session, UserRole } from '@/types'
 import type { AwarenessUser } from '@/hooks/useYjsCollaboration'
 import { useSessionStore } from '@/stores/session'
 import { PresenceAvatarStack } from './PresenceAvatarStack'
+import { ClaimControls } from './ClaimControls'
 
 /** Session awareness state tracking who's watching each session */
 export interface SessionAwareness {
@@ -23,11 +24,17 @@ function SessionCard({
   isActive,
   onClick,
   awareness,
+  userId,
+  userName,
+  userRole,
 }: {
   session: Session
   isActive: boolean
   onClick: () => void
   awareness?: SessionAwareness
+  userId: string
+  userName: string
+  userRole: UserRole
 }) {
 
   const handleDragStart = (e: React.DragEvent<HTMLButtonElement>) => {
@@ -93,8 +100,19 @@ function SessionCard({
           awarenessUsers={awareness?.users}
           lockedBy={awareness?.lockedBy}
           lockedByName={awareness?.lockedByName}
-          maxVisible={4}
+          maxVisible={3}
           size="sm"
+        />
+      </div>
+
+      {/* Claim controls row */}
+      <div className="mt-2 pt-2 border-t border-terminal-border/50 flex items-center justify-end">
+        <ClaimControls
+          sessionId={session.id}
+          userId={userId}
+          userName={userName}
+          userRole={userRole}
+          compact
         />
       </div>
     </button>
@@ -102,7 +120,12 @@ function SessionCard({
 }
 
 export function SessionList({ sessions, sessionAwareness }: SessionListProps) {
-  const { activeSessionId, setActiveSession } = useSessionStore()
+  const { activeSessionId, setActiveSession, user } = useSessionStore()
+
+  // Default to operator role if not set (demo mode)
+  const userId = user?.id || 'anonymous'
+  const userName = user?.name || 'Anonymous'
+  const userRole: UserRole = user?.role || 'operator'
 
   if (sessions.length === 0) {
     return (
@@ -114,7 +137,7 @@ export function SessionList({ sessions, sessionAwareness }: SessionListProps) {
   }
 
   return (
-    <div className="flex flex-col gap-1 p-2">
+    <div className="flex flex-col gap-2 p-2">
       {sessions.map((session) => (
         <SessionCard
           key={session.id}
@@ -122,6 +145,9 @@ export function SessionList({ sessions, sessionAwareness }: SessionListProps) {
           isActive={session.id === activeSessionId}
           onClick={() => setActiveSession(session.id)}
           awareness={sessionAwareness?.get(session.id)}
+          userId={userId}
+          userName={userName}
+          userRole={userRole}
         />
       ))}
     </div>

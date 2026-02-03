@@ -47,13 +47,35 @@
 
   /* Session card */
   .session-card {
-    @apply flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer
+    @apply flex flex-col px-3 py-2 rounded-lg cursor-pointer
            transition-colors duration-150
            hover:bg-terminal-hover;
   }
 
   .session-card.active {
     @apply bg-terminal-hover border-l-2 border-accent-primary;
+  }
+
+  /* Claim control buttons */
+  .claim-btn {
+    @apply flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
+           transition-colors duration-150;
+  }
+
+  .claim-btn-primary {
+    @apply bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30;
+  }
+
+  .claim-btn-success {
+    @apply bg-accent-success/20 text-accent-success hover:bg-accent-success/30;
+  }
+
+  .claim-btn-warning {
+    @apply bg-accent-warning/20 text-accent-warning hover:bg-accent-warning/30;
+  }
+
+  .claim-btn-danger {
+    @apply bg-accent-error/20 text-accent-error hover:bg-accent-error/30;
   }
 
   /* User avatar */
