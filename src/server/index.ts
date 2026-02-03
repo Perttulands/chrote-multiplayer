@@ -12,7 +12,7 @@ import { secureHeaders } from "hono/secure-headers";
 
 import authRoutes from "../routes/auth";
 import invitesRoutes from "../routes/invites";
-import terminalRoutes from "../routes/terminal";
+import terminalRoutes, { setWSServer } from "../routes/terminal";
 import usersRoutes from "../routes/users";
 import { createWSServer, authenticateWSConnection } from "./ws";
 import { getHocuspocusServer } from "./yjs";
@@ -101,6 +101,9 @@ app.notFound((c) => {
 const wsServer = createWSServer({
   authenticate: authenticateWSConnection,
 });
+
+// Wire up WebSocket server to terminal routes for lock management
+setWSServer(wsServer);
 
 // Start WebSocket polling
 wsServer.start();

@@ -8,7 +8,18 @@
 import { Hono } from "hono";
 import { validateSession } from "../lib/session";
 import { getTmuxBridge } from "../server/tmux";
-import { ROLE_HIERARCHY } from "../db/schema";
+import { ROLE_HIERARCHY, type Role } from "../db/schema";
+import type { TerminalWSServer } from "../server/ws";
+
+// WebSocket server instance (set after server initialization)
+let wsServer: TerminalWSServer | null = null;
+
+/**
+ * Set the WebSocket server instance for lock management
+ */
+export function setWSServer(server: TerminalWSServer): void {
+  wsServer = server;
+}
 
 const terminal = new Hono();
 
@@ -173,6 +184,113 @@ terminal.get("/status", async (c) => {
       },
     });
   }
+});
+
+// === Lock Management ===
+
+// Get all current locks
+terminal.get("/locks", async (c) => {
+  if (!wsServer) {
+    return c.json({ error: "WebSocket server not initialized" }, 503);
+  }
+
+  const locks = wsServer.getLocks();
+  return c.json({ locks });
+});
+
+// Get lock for a specific session
+terminal.get("/sessions/:name/lock", async (c) => {
+  if (!wsServer) {
+    return c.json({ error: "WebSocket server not initialized" }, 503);
+  }
+
+  const name = c.req.param("name");
+  const lock = wsServer.getLock(name);
+
+  if (!lock) {
+    return c.json({ locked: false, sessionId: name });
+  }
+
+  return c.json({
+    locked: true,
+    sessionId: name,
+    lockedBy: {
+      id: lock.userId,
+      name: lock.userName,
+    },
+  });
+});
+
+// Acquire lock on a session (operators only)
+terminal.post("/sessions/:name/lock", async (c) => {
+  if (!wsServer) {
+    return c.json({ error: "WebSocket server not initialized" }, 503);
+  }
+
+  const user = c.get("user");
+  const name = c.req.param("name");
+
+  // Check operator permission
+  if (ROLE_HIERARCHY[user.role as Role] < ROLE_HIERARCHY.operator) {
+    return c.json({ error: "Operator role required" }, 403);
+  }
+
+  // Verify session exists
+  const bridge = getTmuxBridge();
+  try {
+    const session = await bridge.getSession(name);
+    if (!session) {
+      return c.json({ error: "Session not found" }, 404);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to verify session";
+    return c.json({ error: message }, 500);
+  }
+
+  // Try to acquire lock
+  const result = wsServer.acquireLock(name, user.id, user.name || user.email, user.role as Role);
+
+  if (!result.success) {
+    return c.json(
+      {
+        error: result.error,
+        locked: true,
+        lockedBy: result.lockedBy,
+      },
+      409
+    );
+  }
+
+  return c.json({
+    success: true,
+    sessionId: name,
+    lockedBy: {
+      id: user.id,
+      name: user.name || user.email,
+    },
+  });
+});
+
+// Release lock on a session
+terminal.post("/sessions/:name/release", async (c) => {
+  if (!wsServer) {
+    return c.json({ error: "WebSocket server not initialized" }, 503);
+  }
+
+  const user = c.get("user");
+  const name = c.req.param("name");
+
+  // Try to release lock
+  const result = wsServer.releaseLock(name, user.id, user.role as Role);
+
+  if (!result.success) {
+    return c.json({ error: result.error }, result.error === "Session not locked" ? 404 : 403);
+  }
+
+  return c.json({
+    success: true,
+    sessionId: name,
+  });
 });
 
 export default terminal;

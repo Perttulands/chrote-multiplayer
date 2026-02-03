@@ -1,8 +1,28 @@
+import { useEffect } from 'react'
 import { SessionList } from './SessionList'
 import { useSessionStore } from '@/stores/session'
+import { useSessionAwareness } from '@/hooks/useSessionAwareness'
 
 export function Sidebar() {
-  const { sessions } = useSessionStore()
+  const { sessions, user, activeSessionId } = useSessionStore()
+
+  // Real-time session awareness for presence indicators
+  const {
+    sessionAwareness,
+    setCurrentSessionId,
+    isConnected: awarenessConnected,
+  } = useSessionAwareness({
+    user: user
+      ? { id: user.id, name: user.name, avatar: user.avatarUrl }
+      : { id: 'anonymous', name: 'Anonymous' },
+  })
+
+  // Update awareness when active session changes
+  useEffect(() => {
+    if (awarenessConnected) {
+      setCurrentSessionId(activeSessionId)
+    }
+  }, [activeSessionId, awarenessConnected, setCurrentSessionId])
 
   return (
     <aside className="w-64 h-full flex flex-col border-r border-terminal-border bg-terminal-surface/30">
@@ -55,7 +75,7 @@ export function Sidebar() {
 
       {/* Session list */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
-        <SessionList sessions={sessions} />
+        <SessionList sessions={sessions} sessionAwareness={sessionAwareness} />
       </div>
 
       {/* Footer actions */}

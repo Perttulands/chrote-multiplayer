@@ -15,7 +15,7 @@ import {
   HTMLContainer,
   TLBaseShape,
 } from 'tldraw'
-import { useEffect, useRef, useCallback, memo } from 'react'
+import { useEffect, useRef, useCallback, memo, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -88,8 +88,8 @@ interface TerminalContentProps {
 
 const TerminalContent = memo(function TerminalContent({
   sessionId,
-  lockedBy,
-  lockedByName,
+  lockedBy: initialLockedBy,
+  lockedByName: initialLockedByName,
   currentUserId,
   onClaim,
   onRelease,
@@ -98,6 +98,16 @@ const TerminalContent = memo(function TerminalContent({
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
+
+  // Track lock state locally (updated from WebSocket)
+  const [lockedBy, setLockedBy] = useState<string | null>(initialLockedBy)
+  const [lockedByName, setLockedByName] = useState<string | null>(initialLockedByName)
+
+  // Sync with prop changes from parent
+  useEffect(() => {
+    setLockedBy(initialLockedBy)
+    setLockedByName(initialLockedByName)
+  }, [initialLockedBy, initialLockedByName])
 
   const isLockedByMe = lockedBy === currentUserId
   const isLocked = lockedBy !== null
@@ -159,8 +169,20 @@ const TerminalContent = memo(function TerminalContent({
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data)
-        if (msg.type === 'output' && msg.sessionId === sessionId) {
-          terminalRef.current?.write(msg.data)
+        if (msg.sessionId === sessionId) {
+          switch (msg.type) {
+            case 'output':
+              terminalRef.current?.write(msg.data)
+              break
+            case 'claimed':
+              setLockedBy(msg.by.id)
+              setLockedByName(msg.by.name)
+              break
+            case 'released':
+              setLockedBy(null)
+              setLockedByName(null)
+              break
+          }
         }
       } catch (e) {
         console.error('WS message parse error:', e)

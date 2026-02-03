@@ -98,7 +98,43 @@ const DEMO_SESSIONS: Session[] = [
         role: 'viewer',
         joinedAt: new Date(),
         lastSeen: new Date(),
-        isOnline: false,
+        isOnline: true,
+      },
+      {
+        userId: 'user-5',
+        user: {
+          id: 'user-5',
+          name: 'Carol Tech',
+          email: 'carol@tech.com',
+        },
+        role: 'viewer',
+        joinedAt: new Date(),
+        lastSeen: new Date(),
+        isOnline: true,
+      },
+      {
+        userId: 'user-6',
+        user: {
+          id: 'user-6',
+          name: 'Dan Smith',
+          email: 'dan@smith.com',
+        },
+        role: 'viewer',
+        joinedAt: new Date(),
+        lastSeen: new Date(),
+        isOnline: true,
+      },
+      {
+        userId: 'user-7',
+        user: {
+          id: 'user-7',
+          name: 'Eve Johnson',
+          email: 'eve@johnson.com',
+        },
+        role: 'viewer',
+        joinedAt: new Date(),
+        lastSeen: new Date(),
+        isOnline: true,
       },
     ],
   },
@@ -111,19 +147,28 @@ function App() {
     setSessions,
     setActiveSession,
     setConnected,
+    fetchSessions,
   } = useSessionStore()
 
-  // Initialize with demo data
+  // Initialize user and fetch sessions from CHROTE API
   useEffect(() => {
     setUser(DEMO_USER)
-    setSessions(DEMO_SESSIONS)
-    setConnected(true)
 
-    // Select first session by default
-    if (DEMO_SESSIONS.length > 0) {
-      setActiveSession(DEMO_SESSIONS[0].id)
-    }
-  }, [setUser, setSessions, setConnected, setActiveSession])
+    // Try to fetch from CHROTE API, fall back to demo data
+    fetchSessions().catch(() => {
+      // Fallback to demo data if API unavailable
+      setSessions(DEMO_SESSIONS)
+      setConnected(true)
+    })
+  }, [setUser, fetchSessions, setSessions, setConnected])
+
+  // Refresh sessions periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchSessions().catch(() => {})
+    }, 10000) // Refresh every 10 seconds
+    return () => clearInterval(interval)
+  }, [fetchSessions])
 
   const handleLogout = () => {
     setUser(null)

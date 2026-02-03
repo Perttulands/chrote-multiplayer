@@ -20,9 +20,6 @@ import { TmuxBridge, TmuxPoller, getTmuxBridge, createTmuxPoller } from "../tmux
 import type { TmuxSession, TmuxEvent } from "../tmux/types";
 import { ROLE_HIERARCHY, type Role } from "../../db/schema";
 
-/** Claim expiration time: 5 minutes of inactivity */
-const CLAIM_EXPIRY_MS = 5 * 60 * 1000;
-
 /** Heartbeat timeout: 30 seconds */
 const HEARTBEAT_TIMEOUT_MS = 30 * 1000;
 
@@ -60,9 +57,6 @@ export class TerminalWSServer {
   /** Heartbeat check timer */
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
-  /** Claim expiry check timer */
-  private claimExpiryTimer: ReturnType<typeof setInterval> | null = null;
-
   constructor(options: WSServerOptions) {
     this.bridge = options.bridge ?? getTmuxBridge();
     this.poller = createTmuxPoller(this.bridge);
@@ -89,11 +83,6 @@ export class TerminalWSServer {
       this.checkHeartbeats();
     }, HEARTBEAT_CHECK_INTERVAL);
 
-    // Start claim expiry checker
-    this.claimExpiryTimer = setInterval(() => {
-      this.checkClaimExpiry();
-    }, HEARTBEAT_CHECK_INTERVAL);
-
     console.log("[WS] Terminal WebSocket server started");
   }
 
@@ -106,11 +95,6 @@ export class TerminalWSServer {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
-    }
-
-    if (this.claimExpiryTimer) {
-      clearInterval(this.claimExpiryTimer);
-      this.claimExpiryTimer = null;
     }
 
     // Close all connections
@@ -322,6 +306,16 @@ export class TerminalWSServer {
       console.error(`[WS] Error getting initial output:`, err);
     }
 
+    // Send current lock state for this session
+    const claim = this.claims.get(sessionId);
+    if (claim) {
+      this.send(ws, {
+        type: "claimed",
+        sessionId,
+        by: { id: claim.userId, name: claim.userName },
+      });
+    }
+
     // Broadcast updated presence
     this.broadcastPresence(sessionId);
   }
@@ -384,9 +378,6 @@ export class TerminalWSServer {
     // Send keys
     try {
       await this.bridge.sendKeys(sessionId, keys, pane ?? "0");
-
-      // Refresh claim expiry on activity
-      claim.expiresAt = new Date(Date.now() + CLAIM_EXPIRY_MS);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send keys";
       this.sendError(ws, ErrorCodes.TMUX_ERROR, msg);
@@ -436,7 +427,6 @@ export class TerminalWSServer {
       sessionId,
       userId: state.userId,
       userName: state.userName,
-      expiresAt: new Date(Date.now() + CLAIM_EXPIRY_MS),
     };
     this.claims.set(sessionId, claim);
 
@@ -445,7 +435,6 @@ export class TerminalWSServer {
       type: "claimed",
       sessionId,
       by: { id: state.userId, name: state.userName },
-      expiresAt: claim.expiresAt.toISOString(),
     });
 
     // Update presence
@@ -566,22 +555,6 @@ export class TerminalWSServer {
   }
 
   /**
-   * Check for expired claims and release
-   */
-  private checkClaimExpiry(): void {
-    const now = Date.now();
-
-    for (const [sessionId, claim] of this.claims) {
-      if (now > claim.expiresAt.getTime()) {
-        console.log(`[WS] Claim expired: ${sessionId}`);
-        this.claims.delete(sessionId);
-        this.broadcast(sessionId, { type: "released", sessionId });
-        this.broadcastPresence(sessionId);
-      }
-    }
-  }
-
-  /**
    * Send message to a single client
    */
   private send(ws: WebSocket, message: ServerMessage): void {
@@ -647,6 +620,113 @@ export class TerminalWSServer {
       subscriptions: this.poller.getSubscriptions().size,
       claims: this.claims.size,
     };
+  }
+
+  /**
+   * Get all current locks (for REST API)
+   */
+  getLocks(): Array<{ sessionId: string; userId: string; userName: string }> {
+    return Array.from(this.claims.values()).map((claim) => ({
+      sessionId: claim.sessionId,
+      userId: claim.userId,
+      userName: claim.userName,
+    }));
+  }
+
+  /**
+   * Get lock for a specific session (for REST API)
+   */
+  getLock(sessionId: string): ClaimState | null {
+    return this.claims.get(sessionId) ?? null;
+  }
+
+  /**
+   * Acquire lock via REST API
+   * Returns true if lock acquired, false if already locked by another user
+   */
+  acquireLock(
+    sessionId: string,
+    userId: string,
+    userName: string,
+    role: Role
+  ): { success: boolean; error?: string; lockedBy?: { id: string; name: string } } {
+    // Check permission - must be operator+
+    if (ROLE_HIERARCHY[role] < ROLE_HIERARCHY.operator) {
+      return { success: false, error: "Only operators can acquire locks" };
+    }
+
+    // Check if already claimed by someone else
+    const existingClaim = this.claims.get(sessionId);
+    if (existingClaim && existingClaim.userId !== userId) {
+      // Check if admin can override
+      if (ROLE_HIERARCHY[role] < ROLE_HIERARCHY.admin) {
+        return {
+          success: false,
+          error: `Session locked by ${existingClaim.userName}`,
+          lockedBy: { id: existingClaim.userId, name: existingClaim.userName },
+        };
+      }
+      // Admin override - notify previous holder
+      this.notifyUser(existingClaim.userId, {
+        type: "released",
+        sessionId,
+      });
+    }
+
+    // Create claim
+    const claim: ClaimState = {
+      sessionId,
+      userId,
+      userName,
+    };
+    this.claims.set(sessionId, claim);
+
+    // Broadcast claim to all subscribed clients
+    this.broadcast(sessionId, {
+      type: "claimed",
+      sessionId,
+      by: { id: userId, name: userName },
+    });
+
+    // Also broadcast to all clients so non-subscribers can see lock state
+    this.broadcastAll({
+      type: "claimed",
+      sessionId,
+      by: { id: userId, name: userName },
+    });
+
+    this.broadcastPresence(sessionId);
+
+    return { success: true };
+  }
+
+  /**
+   * Release lock via REST API
+   * Returns true if released, false if not allowed
+   */
+  releaseLock(
+    sessionId: string,
+    userId: string,
+    role: Role
+  ): { success: boolean; error?: string } {
+    const claim = this.claims.get(sessionId);
+    if (!claim) {
+      return { success: false, error: "Session not locked" };
+    }
+
+    // Only the holder or admin can release
+    if (claim.userId !== userId && ROLE_HIERARCHY[role] < ROLE_HIERARCHY.admin) {
+      return { success: false, error: "Cannot release others' locks" };
+    }
+
+    this.claims.delete(sessionId);
+
+    // Broadcast release
+    this.broadcast(sessionId, { type: "released", sessionId });
+    this.broadcastAll({ type: "released", sessionId });
+    this.broadcastPresence(sessionId);
+
+    return { success: true };
   }
 }
 

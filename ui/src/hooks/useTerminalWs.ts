@@ -20,7 +20,6 @@ interface ClaimedMessage {
   type: 'claimed'
   sessionId: string
   by: { id: string; name: string }
-  expiresAt: string
 }
 
 interface ReleasedMessage {

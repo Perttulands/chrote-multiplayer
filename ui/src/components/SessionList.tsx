@@ -1,34 +1,63 @@
 import { clsx } from 'clsx'
-import type { Session, PresenceStatus } from '@/types'
+import type { Session } from '@/types'
+import type { AwarenessUser } from '@/hooks/useYjsCollaboration'
 import { useSessionStore } from '@/stores/session'
+import { PresenceAvatarStack } from './PresenceAvatarStack'
+
+/** Session awareness state tracking who's watching each session */
+export interface SessionAwareness {
+  sessionId: string
+  users: AwarenessUser[]
+  lockedBy?: string | null
+  lockedByName?: string | null
+}
 
 interface SessionListProps {
   sessions: Session[]
+  /** Real-time awareness data per session */
+  sessionAwareness?: Map<string, SessionAwareness>
 }
 
-function PresenceDot({ status }: { status: PresenceStatus }) {
-  return (
-    <span
-      className={clsx('presence-dot', {
-        online: status === 'online',
-        idle: status === 'idle',
-        offline: status === 'offline',
-      })}
-    />
-  )
-}
-
-function SessionCard({ session, isActive, onClick }: {
+function SessionCard({
+  session,
+  isActive,
+  onClick,
+  awareness,
+}: {
   session: Session
   isActive: boolean
   onClick: () => void
+  awareness?: SessionAwareness
 }) {
-  const onlineCount = session.participants.filter((p) => p.isOnline).length
+
+  const handleDragStart = (e: React.DragEvent<HTMLButtonElement>) => {
+    // Set drag data with session info
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      sessionId: session.id,
+      sessionName: session.name,
+      tmuxSession: session.tmuxSession,
+    }))
+    e.dataTransfer.effectAllowed = 'copy'
+
+    // Create custom drag image
+    const dragImage = document.createElement('div')
+    dragImage.className = 'fixed pointer-events-none px-3 py-2 bg-terminal-surface border border-accent-primary rounded-lg text-sm text-gray-100 shadow-lg'
+    dragImage.textContent = session.name
+    dragImage.style.position = 'absolute'
+    dragImage.style.top = '-1000px'
+    document.body.appendChild(dragImage)
+    e.dataTransfer.setDragImage(dragImage, 0, 0)
+
+    // Clean up drag image after drag starts
+    setTimeout(() => document.body.removeChild(dragImage), 0)
+  }
 
   return (
     <button
-      className={clsx('session-card w-full text-left', { active: isActive })}
+      className={clsx('session-card w-full text-left cursor-grab active:cursor-grabbing', { active: isActive })}
       onClick={onClick}
+      draggable
+      onDragStart={handleDragStart}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {/* Session icon */}
@@ -58,17 +87,21 @@ function SessionCard({ session, isActive, onClick }: {
           </div>
         </div>
 
-        {/* Participant count */}
-        <div className="flex items-center gap-1.5">
-          <PresenceDot status={onlineCount > 0 ? 'online' : 'offline'} />
-          <span className="text-xs text-gray-500">{onlineCount}</span>
-        </div>
+        {/* Presence avatars */}
+        <PresenceAvatarStack
+          participants={session.participants}
+          awarenessUsers={awareness?.users}
+          lockedBy={awareness?.lockedBy}
+          lockedByName={awareness?.lockedByName}
+          maxVisible={4}
+          size="sm"
+        />
       </div>
     </button>
   )
 }
 
-export function SessionList({ sessions }: SessionListProps) {
+export function SessionList({ sessions, sessionAwareness }: SessionListProps) {
   const { activeSessionId, setActiveSession } = useSessionStore()
 
   if (sessions.length === 0) {
@@ -88,6 +121,7 @@ export function SessionList({ sessions }: SessionListProps) {
           session={session}
           isActive={session.id === activeSessionId}
           onClick={() => setActiveSession(session.id)}
+          awareness={sessionAwareness?.get(session.id)}
         />
       ))}
     </div>
