@@ -9,11 +9,13 @@
 
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
-import { eq, desc, ne } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 
-import { db, users, auditLog, ROLE_HIERARCHY, type Role } from "../db";
+import { db, users, auditLog, type Role } from "../db";
 import { validateSession } from "../lib/session";
+import { canManageUsers, type Role as PermRole } from "../permissions";
+import { canChangeRole, canRemoveUser } from "../permissions/roles";
 
 const usersRouter = new Hono();
 
@@ -31,8 +33,8 @@ async function requireAdmin(c: any, next: any) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const userRole = result.user.role as Role;
-  if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.admin) {
+  const userRole = result.user.role as PermRole;
+  if (!canManageUsers(userRole)) {
     return c.json({ error: "Forbidden: Admin access required" }, 403);
   }
 
@@ -121,113 +123,21 @@ usersRouter.patch("/:id/role", requireAdmin, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  const currentUserRole = currentUser.role as Role;
-  const targetUserRole = targetUser.role as Role;
-
-  // === Validation Rules ===
-
   // Cannot change own role
   if (currentUser.id === targetUser.id) {
     return c.json({ error: "Cannot change your own role" }, 403);
   }
 
-  // Cannot modify owner
-  if (targetUserRole === "owner") {
-    return c.json({ error: "Cannot modify owner role" }, 403);
+  // Use permission system to validate role change
+  const currentUserRole = currentUser.role as PermRole;
+  const targetUserRole = targetUser.role as PermRole;
+
+  const result = canChangeRole(currentUserRole, targetUserRole, newRole as PermRole);
+  if (!result.allowed) {
+    return c.json({ error: result.reason }, 403);
   }
 
-  // Owner can do anything (except change themselves, checked above)
-  if (currentUserRole === "owner") {
-    // Owner can promote/demote anyone to any non-owner role
-    return applyRoleChange(c, targetUser, newRole, currentUser);
-  }
-
-  // Admin promotion/demotion rules
-  if (currentUserRole === "admin") {
-    // Admin cannot promote to admin (only owner can)
-    if (newRole === "admin") {
-      return c.json({ error: "Only owner can create admins" }, 403);
-    }
-
-    // Admin cannot demote other admins
-    if (targetUserRole === "admin") {
-      return c.json({ error: "Admins cannot demote other admins" }, 403);
-    }
-
-    // Admin can promote: Viewer → Operator
-    // Admin can demote: Operator → Viewer
-    return applyRoleChange(c, targetUser, newRole, currentUser);
-  }
-
-  // Should not reach here due to requireAdmin middleware
-  return c.json({ error: "Forbidden" }, 403);
-});
-
-// === Delete User (Admin+) ===
-
-usersRouter.delete("/:id", requireAdmin, async (c) => {
-  const id = c.req.param("id");
-  const currentUser = c.get("user");
-
-  // Get target user
-  const targetUser = db.query.users.findFirst({
-    where: (u, { eq }) => eq(u.id, id),
-  });
-
-  if (!targetUser) {
-    return c.json({ error: "User not found" }, 404);
-  }
-
-  const currentUserRole = currentUser.role as Role;
-  const targetUserRole = targetUser.role as Role;
-
-  // Cannot delete self
-  if (currentUser.id === targetUser.id) {
-    return c.json({ error: "Cannot delete yourself" }, 403);
-  }
-
-  // Cannot delete owner
-  if (targetUserRole === "owner") {
-    return c.json({ error: "Cannot delete owner" }, 403);
-  }
-
-  // Only owner can delete admins
-  if (targetUserRole === "admin" && currentUserRole !== "owner") {
-    return c.json({ error: "Only owner can delete admins" }, 403);
-  }
-
-  // Delete user (cascades to sessions, claims, presence)
-  db.delete(users).where(eq(users.id, id)).run();
-
-  // Audit log
-  db.insert(auditLog)
-    .values({
-      id: nanoid(),
-      user_id: currentUser.id,
-      action: "user_deleted",
-      resource_type: "user",
-      resource_id: id,
-      details: JSON.stringify({
-        deleted_email: targetUser.email,
-        deleted_role: targetUserRole,
-      }),
-      ip_address:
-        c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
-      user_agent: c.req.header("user-agent") || null,
-    })
-    .run();
-
-  return c.json({ success: true });
-});
-
-// === Helper: Apply Role Change ===
-
-async function applyRoleChange(
-  c: any,
-  targetUser: any,
-  newRole: string,
-  currentUser: any
-) {
+  // Apply the role change
   const oldRole = targetUser.role;
 
   // No change needed
@@ -280,6 +190,59 @@ async function applyRoleChange(
       previous_role: oldRole,
     },
   });
-}
+});
+
+// === Delete User (Admin+) ===
+
+usersRouter.delete("/:id", requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+
+  // Get target user
+  const targetUser = db.query.users.findFirst({
+    where: (u, { eq }) => eq(u.id, id),
+  });
+
+  if (!targetUser) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  // Cannot delete self
+  if (currentUser.id === targetUser.id) {
+    return c.json({ error: "Cannot delete yourself" }, 403);
+  }
+
+  // Use permission system to validate removal
+  const currentUserRole = currentUser.role as PermRole;
+  const targetUserRole = targetUser.role as PermRole;
+
+  const result = canRemoveUser(currentUserRole, targetUserRole);
+  if (!result.allowed) {
+    return c.json({ error: result.reason }, 403);
+  }
+
+  // Delete user (cascades to sessions, claims, presence)
+  db.delete(users).where(eq(users.id, id)).run();
+
+  // Audit log
+  db.insert(auditLog)
+    .values({
+      id: nanoid(),
+      user_id: currentUser.id,
+      action: "user_deleted",
+      resource_type: "user",
+      resource_id: id,
+      details: JSON.stringify({
+        deleted_email: targetUser.email,
+        deleted_role: targetUserRole,
+      }),
+      ip_address:
+        c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+      user_agent: c.req.header("user-agent") || null,
+    })
+    .run();
+
+  return c.json({ success: true });
+});
 
 export default usersRouter;
