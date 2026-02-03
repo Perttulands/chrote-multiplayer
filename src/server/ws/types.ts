@@ -89,6 +89,7 @@ export interface ClaimedMessage {
     id: string;
     name: string;
   };
+  claimedAt: string;
 }
 
 export interface ReleasedMessage {
@@ -194,4 +195,6 @@ export interface ClaimState {
   /** User who has control */
   userId: string;
   userName: string;
+  /** When the claim was acquired */
+  claimedAt: Date;
 }

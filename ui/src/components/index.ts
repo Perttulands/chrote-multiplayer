@@ -1,6 +1,7 @@
 export { Header } from './Header'
 export { Sidebar } from './Sidebar'
 export { InvitePanel } from './InvitePanel'
+export { UserManagementPanel } from './UserManagementPanel'
 export { SessionList } from './SessionList'
 export type { SessionAwareness } from './SessionList'
 export { Terminal, useTerminalRef } from './Terminal'

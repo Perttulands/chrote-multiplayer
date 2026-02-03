@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { User } from '@/types'
 import { useSessionStore } from '@/stores/session'
 import { InvitePanel } from './InvitePanel'
+import { UserManagementPanel } from './UserManagementPanel'
 
 interface HeaderProps {
   user: User | null
@@ -67,11 +68,14 @@ function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
 export function Header({ user, onLogout }: HeaderProps) {
   const { isConnected } = useSessionStore()
   const [showInvitePanel, setShowInvitePanel] = useState(false)
+  const [showUserPanel, setShowUserPanel] = useState(false)
 
   return (
     <header className="h-14 px-4 flex items-center justify-between border-b border-terminal-border bg-terminal-surface/50 backdrop-blur-sm">
       {/* Invite Panel Modal */}
       <InvitePanel isOpen={showInvitePanel} onClose={() => setShowInvitePanel(false)} />
+      {/* User Management Panel Modal */}
+      <UserManagementPanel isOpen={showUserPanel} onClose={() => setShowUserPanel(false)} />
 
       {/* Logo and connection status */}
       <div className="flex items-center gap-3">
@@ -110,6 +114,24 @@ export function Header({ user, onLogout }: HeaderProps) {
 
       {/* User section */}
       <div className="flex items-center gap-2">
+        {/* Manage Users button */}
+        {user && (
+          <button
+            onClick={() => setShowUserPanel(true)}
+            className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-terminal-hover transition-colors"
+            title="Manage Users"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+              />
+            </svg>
+          </button>
+        )}
+
         {/* Invite button (admin only - shown when user exists) */}
         {user && (
           <button

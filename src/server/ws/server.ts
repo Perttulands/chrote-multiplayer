@@ -313,6 +313,7 @@ export class TerminalWSServer {
         type: "claimed",
         sessionId,
         by: { id: claim.userId, name: claim.userName },
+        claimedAt: claim.claimedAt.toISOString(),
       });
     }
 
@@ -423,10 +424,12 @@ export class TerminalWSServer {
     }
 
     // Create claim
+    const claimedAt = new Date();
     const claim: ClaimState = {
       sessionId,
       userId: state.userId,
       userName: state.userName,
+      claimedAt,
     };
     this.claims.set(sessionId, claim);
 
@@ -435,6 +438,7 @@ export class TerminalWSServer {
       type: "claimed",
       sessionId,
       by: { id: state.userId, name: state.userName },
+      claimedAt: claimedAt.toISOString(),
     });
 
     // Update presence
@@ -625,11 +629,12 @@ export class TerminalWSServer {
   /**
    * Get all current locks (for REST API)
    */
-  getLocks(): Array<{ sessionId: string; userId: string; userName: string }> {
+  getLocks(): Array<{ sessionId: string; userId: string; userName: string; claimedAt: string }> {
     return Array.from(this.claims.values()).map((claim) => ({
       sessionId: claim.sessionId,
       userId: claim.userId,
       userName: claim.userName,
+      claimedAt: claim.claimedAt.toISOString(),
     }));
   }
 
@@ -674,10 +679,12 @@ export class TerminalWSServer {
     }
 
     // Create claim
+    const claimedAt = new Date();
     const claim: ClaimState = {
       sessionId,
       userId,
       userName,
+      claimedAt,
     };
     this.claims.set(sessionId, claim);
 
@@ -686,6 +693,7 @@ export class TerminalWSServer {
       type: "claimed",
       sessionId,
       by: { id: userId, name: userName },
+      claimedAt: claimedAt.toISOString(),
     });
 
     // Also broadcast to all clients so non-subscribers can see lock state
@@ -693,6 +701,7 @@ export class TerminalWSServer {
       type: "claimed",
       sessionId,
       by: { id: userId, name: userName },
+      claimedAt: claimedAt.toISOString(),
     });
 
     this.broadcastPresence(sessionId);

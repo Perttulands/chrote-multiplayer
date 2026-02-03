@@ -218,6 +218,7 @@ terminal.get("/sessions/:name/lock", async (c) => {
       id: lock.userId,
       name: lock.userName,
     },
+    claimedAt: lock.claimedAt.toISOString(),
   });
 });
 
@@ -261,6 +262,7 @@ terminal.post("/sessions/:name/lock", async (c) => {
     );
   }
 
+  const newLock = wsServer.getLock(name);
   return c.json({
     success: true,
     sessionId: name,
@@ -268,6 +270,7 @@ terminal.post("/sessions/:name/lock", async (c) => {
       id: user.id,
       name: user.name || user.email,
     },
+    claimedAt: newLock?.claimedAt.toISOString(),
   });
 });
 
