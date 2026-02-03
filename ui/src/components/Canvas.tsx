@@ -7,9 +7,16 @@
 
 import { Tldraw, track, useEditor, TLComponents, createShapeId, Editor } from 'tldraw'
 import 'tldraw/tldraw.css'
-import { useMemo, useEffect, useCallback, createContext, useContext } from 'react'
+import { useMemo, useEffect, useCallback, createContext, useContext, useState, useRef } from 'react'
 import { TerminalShapeUtil, TERMINAL_WIDTH, TERMINAL_HEIGHT, type TerminalShape } from '../shapes'
 import { useSessionStore } from '../stores/session'
+
+// Drag data type
+interface SessionDragData {
+  sessionId: string
+  sessionName: string
+  tmuxSession: string
+}
 
 // ============================================================================
 // Terminal Context (provides auth + WebSocket to shapes)
@@ -170,12 +177,66 @@ export interface CanvasProps {
  */
 export function Canvas({ className }: CanvasProps) {
   const user = useSessionStore((s) => s.user)
+  const editorRef = useRef<Editor | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   // WebSocket reference for claim/release
   const wsRef = useMemo(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`)
     return { current: ws }
+  }, [])
+
+  // Handle drag over
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setIsDragOver(true)
+  }, [])
+
+  // Handle drag leave
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only set false if we're leaving the container (not entering a child)
+    if (e.currentTarget === e.target) {
+      setIsDragOver(false)
+    }
+  }, [])
+
+  // Handle drop
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const editor = editorRef.current
+    if (!editor) return
+
+    // Get drag data
+    const dataStr = e.dataTransfer.getData('application/json')
+    if (!dataStr) return
+
+    let dragData: SessionDragData
+    try {
+      dragData = JSON.parse(dataStr)
+    } catch {
+      return
+    }
+
+    // Convert screen coordinates to canvas coordinates
+    const rect = e.currentTarget.getBoundingClientRect()
+    const screenX = e.clientX - rect.left
+    const screenY = e.clientY - rect.top
+
+    // Use tldraw's coordinate conversion
+    const point = editor.screenToPage({ x: screenX, y: screenY })
+
+    // Center the terminal at drop position
+    const x = point.x - TERMINAL_WIDTH / 2
+    const y = point.y - TERMINAL_HEIGHT / 2
+
+    // Create terminal shape
+    addTerminalToCanvas(editor, dragData.tmuxSession, x, y)
+
+    console.log('[Canvas] Created terminal for session:', dragData.sessionName)
   }, [])
 
   // Cleanup WebSocket on unmount
@@ -217,13 +278,29 @@ export function Canvas({ className }: CanvasProps) {
 
   return (
     <TerminalContext.Provider value={contextValue}>
-      <div className={`w-full h-full ${className || ''}`}>
+      <div
+        className={`w-full h-full relative ${className || ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Drop zone indicator */}
+        {isDragOver && (
+          <div className="absolute inset-0 z-50 pointer-events-none border-4 border-dashed border-accent-primary/60 bg-accent-primary/5 flex items-center justify-center">
+            <div className="px-6 py-3 rounded-xl bg-terminal-surface/90 border border-accent-primary/40 shadow-lg">
+              <span className="text-lg text-accent-primary font-medium">Drop to create terminal</span>
+            </div>
+          </div>
+        )}
         <Tldraw
           shapeUtils={customShapeUtils}
           persistenceKey="chrote-canvas"
           hideUi={false}
           components={components}
           onMount={(editor) => {
+            // Store editor reference for drop handling
+            editorRef.current = editor
+
             // Set dark theme
             editor.user.updateUserPreferences({
               colorScheme: 'dark',

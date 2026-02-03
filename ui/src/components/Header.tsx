@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { User } from '@/types'
 import { useSessionStore } from '@/stores/session'
+import { InvitePanel } from './InvitePanel'
 
 interface HeaderProps {
   user: User | null
@@ -64,9 +66,13 @@ function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
 
 export function Header({ user, onLogout }: HeaderProps) {
   const { isConnected } = useSessionStore()
+  const [showInvitePanel, setShowInvitePanel] = useState(false)
 
   return (
     <header className="h-14 px-4 flex items-center justify-between border-b border-terminal-border bg-terminal-surface/50 backdrop-blur-sm">
+      {/* Invite Panel Modal */}
+      <InvitePanel isOpen={showInvitePanel} onClose={() => setShowInvitePanel(false)} />
+
       {/* Logo and connection status */}
       <div className="flex items-center gap-3">
         {/* Logo */}
@@ -103,13 +109,33 @@ export function Header({ user, onLogout }: HeaderProps) {
       </div>
 
       {/* User section */}
-      {user ? (
-        <UserMenu user={user} onLogout={onLogout} />
-      ) : (
-        <button className="px-4 py-2 rounded-lg bg-accent-primary hover:bg-accent-primary/90 text-white text-sm font-medium transition-colors">
-          Sign In
-        </button>
-      )}
+      <div className="flex items-center gap-2">
+        {/* Invite button (admin only - shown when user exists) */}
+        {user && (
+          <button
+            onClick={() => setShowInvitePanel(true)}
+            className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-terminal-hover transition-colors"
+            title="Manage Invites"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+              />
+            </svg>
+          </button>
+        )}
+
+        {user ? (
+          <UserMenu user={user} onLogout={onLogout} />
+        ) : (
+          <button className="px-4 py-2 rounded-lg bg-accent-primary hover:bg-accent-primary/90 text-white text-sm font-medium transition-colors">
+            Sign In
+          </button>
+        )}
+      </div>
     </header>
   )
 }
