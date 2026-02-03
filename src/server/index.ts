@@ -12,6 +12,7 @@ import { secureHeaders } from "hono/secure-headers";
 
 import authRoutes from "../routes/auth";
 import invitesRoutes from "../routes/invites";
+import { createWSServer, authenticateWSConnection } from "./ws";
 
 const app = new Hono();
 
