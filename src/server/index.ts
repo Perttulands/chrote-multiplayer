@@ -12,6 +12,7 @@ import { secureHeaders } from "hono/secure-headers";
 
 import authRoutes from "../routes/auth";
 import invitesRoutes from "../routes/invites";
+import terminalRoutes from "../routes/terminal";
 import { createWSServer, authenticateWSConnection } from "./ws";
 
 const app = new Hono();
@@ -58,6 +59,7 @@ app.get("/api/health", (c) => {
 
 app.route("/api/auth", authRoutes);
 app.route("/api/invites", invitesRoutes);
+app.route("/api/terminal", terminalRoutes);
 
 // API info
 app.get("/api", (c) => {
@@ -90,6 +92,20 @@ app.notFound((c) => {
   return c.json({ error: "Not found" }, 404);
 });
 
+// === WebSocket Server ===
+
+const wsServer = createWSServer({
+  authenticate: authenticateWSConnection,
+});
+
+// Start WebSocket polling
+wsServer.start();
+
+// WebSocket stats endpoint
+app.get("/api/ws/stats", (c) => {
+  return c.json(wsServer.getStats());
+});
+
 // === Start Server ===
 
 const port = parseInt(process.env.PORT || "3000");
@@ -97,7 +113,35 @@ const port = parseInt(process.env.PORT || "3000");
 console.log(`🚀 CHROTE Multiplayer server starting on port ${port}`);
 console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
 
+// Cleanup on shutdown
+process.on("SIGINT", () => {
+  console.log("\n🛑 Shutting down...");
+  wsServer.stop();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  console.log("\n🛑 Shutting down...");
+  wsServer.stop();
+  process.exit(0);
+});
+
 export default {
   port,
   fetch: app.fetch,
+  // Bun WebSocket handler
+  websocket: {
+    open(ws: WebSocket) {
+      // Connection opened - actual handling done in upgrade
+    },
+    message(ws: WebSocket, message: string | Buffer) {
+      // Messages handled by the wsServer via addEventListener
+    },
+    close(ws: WebSocket) {
+      // Cleanup handled by the wsServer via addEventListener
+    },
+  },
 };
+
+// Export for WebSocket upgrade handling
+export { wsServer };
