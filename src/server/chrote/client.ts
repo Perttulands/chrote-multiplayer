@@ -120,6 +120,54 @@ export class ChroteClient {
     const sessions = await this.listSessions();
     return sessions.find((s) => s.name === name) ?? null;
   }
+
+  /**
+   * Capture pane content from a tmux session
+   */
+  async capturePane(
+    session: string,
+    pane: string
+  ): Promise<{ session: string; pane: string; content: string; timestamp: string }> {
+    const url = `${this.baseUrl}/api/tmux/sessions/${encodeURIComponent(session)}/capture`;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`Session '${session}' not found`);
+        }
+        throw new Error(`CHROTE API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as { content?: string; output?: string; timestamp?: string };
+      return {
+        session,
+        pane,
+        content: data.content ?? data.output ?? "",
+        timestamp: data.timestamp ?? new Date().toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          throw new Error(`CHROTE API timeout after ${this.timeout}ms`);
+        }
+        throw error;
+      }
+      throw error;
+    }
+  }
 }
 
 /** Singleton instance */

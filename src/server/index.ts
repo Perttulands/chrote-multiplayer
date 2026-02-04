@@ -13,8 +13,9 @@ import { secureHeaders } from "hono/secure-headers";
 import authRoutes from "../routes/auth";
 import invitesRoutes from "../routes/invites";
 import terminalRoutes, { setWSServer } from "../routes/terminal";
+import tmuxRoutes from "../routes/tmux";
 import usersRoutes from "../routes/users";
-import { createWSServer, authenticateWSConnection } from "./ws";
+import { createWSServer, authenticateWSConnection, createPerSessionWSServer } from "./ws";
 import { getHocuspocusServer } from "./yjs";
 
 const app = new Hono();
@@ -62,6 +63,7 @@ app.get("/api/health", (c) => {
 app.route("/api/auth", authRoutes);
 app.route("/api/invites", invitesRoutes);
 app.route("/api/terminal", terminalRoutes);
+app.route("/api/tmux", tmuxRoutes);
 app.route("/api/users", usersRoutes);
 
 // API info
@@ -108,9 +110,25 @@ setWSServer(wsServer);
 // Start WebSocket polling
 wsServer.start();
 
+// === Per-Session WebSocket Server ===
+
+const perSessionWSServer = createPerSessionWSServer();
+
+// Wire up claim holder lookup from main WS server
+perSessionWSServer.setClaimHolderLookup((sessionId) => {
+  const lock = wsServer.getLock(sessionId);
+  return lock ? { userId: lock.userId } : null;
+});
+
+// Start per-session server
+perSessionWSServer.start();
+
 // WebSocket stats endpoint
 app.get("/api/ws/stats", (c) => {
-  return c.json(wsServer.getStats());
+  return c.json({
+    main: wsServer.getStats(),
+    perSession: perSessionWSServer.getStats(),
+  });
 });
 
 // === Hocuspocus (Yjs) Server ===
@@ -142,6 +160,7 @@ console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
 process.on("SIGINT", async () => {
   console.log("\n🛑 Shutting down...");
   wsServer.stop();
+  perSessionWSServer.stop();
   await hocuspocus.destroy();
   process.exit(0);
 });
@@ -149,6 +168,7 @@ process.on("SIGINT", async () => {
 process.on("SIGTERM", async () => {
   console.log("\n🛑 Shutting down...");
   wsServer.stop();
+  perSessionWSServer.stop();
   await hocuspocus.destroy();
   process.exit(0);
 });
@@ -156,6 +176,12 @@ process.on("SIGTERM", async () => {
 // Type for WebSocket with attached data
 interface WSData {
   request: Request;
+  /** Type of WebSocket connection */
+  wsType: "main" | "per-session";
+  /** Session ID for per-session connections */
+  sessionId?: string;
+  /** Pane for per-session connections */
+  pane?: string;
 }
 
 // Export wsServer for other modules
@@ -167,22 +193,32 @@ export default {
   // Custom fetch handler that handles WebSocket upgrades
   fetch(request: Request, server: { upgrade: (req: Request, opts?: { data?: WSData }) => boolean; requestIP: (req: Request) => { address: string } | null }) {
     const url = new URL(request.url);
+    const upgradeHeader = request.headers.get("Upgrade");
 
-    // Handle WebSocket upgrade on /ws path
-    if (url.pathname === "/ws") {
-      // Check for WebSocket upgrade header
-      const upgradeHeader = request.headers.get("Upgrade");
-      if (upgradeHeader?.toLowerCase() === "websocket") {
-        // Upgrade the connection, storing the request for authentication
-        const success = server.upgrade(request, {
-          data: { request },
-        });
-        if (success) {
-          // Bun handles the upgrade response
-          return undefined;
-        }
-        return new Response("WebSocket upgrade failed", { status: 500 });
+    // Handle WebSocket upgrade on /ws path (main WS server)
+    if (url.pathname === "/ws" && upgradeHeader?.toLowerCase() === "websocket") {
+      const success = server.upgrade(request, {
+        data: { request, wsType: "main" },
+      });
+      if (success) {
+        return undefined;
       }
+      return new Response("WebSocket upgrade failed", { status: 500 });
+    }
+
+    // Handle WebSocket upgrade on /ws/terminal/:sessionId path (per-session WS)
+    const perSessionMatch = url.pathname.match(/^\/ws\/terminal\/([^/]+)$/);
+    if (perSessionMatch && upgradeHeader?.toLowerCase() === "websocket") {
+      const sessionId = decodeURIComponent(perSessionMatch[1]);
+      const pane = url.searchParams.get("pane") ?? "0";
+
+      const success = server.upgrade(request, {
+        data: { request, wsType: "per-session", sessionId, pane },
+      });
+      if (success) {
+        return undefined;
+      }
+      return new Response("WebSocket upgrade failed", { status: 500 });
     }
 
     // For all other requests, use the Hono app
@@ -191,20 +227,47 @@ export default {
   // WebSocket handlers
   websocket: {
     async open(ws: { data: WSData }) {
-      // Get the original request from upgrade data
       const data = ws.data;
-      console.log("[WS] Connection opened, authenticating...");
 
-      // Pass to the terminal WebSocket server
-      await wsServer.handleConnection(ws as unknown as WebSocket, data.request);
+      if (data.wsType === "per-session") {
+        // Per-session WebSocket: authenticate and connect to specific session
+        console.log(`[WS] Per-session connection opened for ${data.sessionId}, authenticating...`);
+
+        const auth = await authenticateWSConnection(data.request);
+        if (!auth) {
+          (ws as unknown as WebSocket).close(4001, "Authentication required");
+          return;
+        }
+
+        await perSessionWSServer.handleConnection(
+          ws as unknown as WebSocket,
+          auth,
+          data.sessionId!,
+          data.pane
+        );
+      } else {
+        // Main WebSocket server
+        console.log("[WS] Connection opened, authenticating...");
+        await wsServer.handleConnection(ws as unknown as WebSocket, data.request);
+      }
     },
-    message(ws: unknown, message: string | Buffer) {
-      // Route message to the terminal WebSocket server
-      wsServer.handleWsMessage(ws as WebSocket, message);
+    message(ws: { data: WSData }, message: string | Buffer) {
+      const data = ws.data;
+
+      if (data.wsType === "per-session") {
+        perSessionWSServer.handleWsMessage(ws as unknown as WebSocket, message);
+      } else {
+        wsServer.handleWsMessage(ws as unknown as WebSocket, message);
+      }
     },
-    close(ws: unknown) {
-      // Route close event to the terminal WebSocket server
-      wsServer.handleWsClose(ws as WebSocket);
+    close(ws: { data: WSData }) {
+      const data = ws.data;
+
+      if (data.wsType === "per-session") {
+        perSessionWSServer.handleWsClose(ws as unknown as WebSocket);
+      } else {
+        wsServer.handleWsClose(ws as unknown as WebSocket);
+      }
     },
   },
 };

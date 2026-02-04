@@ -8,6 +8,7 @@ REST and WebSocket API documentation for CHROTE Multiplayer.
 - [REST API](#rest-api)
   - [Auth Endpoints](#auth-endpoints)
   - [Session Endpoints](#session-endpoints)
+  - [Tmux Endpoints (CHROTE Proxy)](#tmux-endpoints-chrote-proxy)
   - [User Endpoints](#user-endpoints)
   - [Invite Endpoints](#invite-endpoints)
 - [WebSocket Protocol](#websocket-protocol)
@@ -226,6 +227,46 @@ Release claim on a session.
 ```json
 {
   "success": true
+}
+```
+
+---
+
+### Tmux Endpoints (CHROTE Proxy)
+
+#### `GET /api/tmux/sessions/:session/panes/:pane/capture`
+
+Capture terminal pane content from a tmux session via CHROTE API.
+
+**Required Permission:** `view` (all authenticated users)
+
+**Path Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `session` | string | Tmux session name (e.g., `chrote-chat`) |
+| `pane` | string | Pane index (e.g., `0`) |
+
+**Response:**
+```json
+{
+  "session": "chrote-chat",
+  "pane": "0",
+  "content": "user@host:~$ ls\nfile1.txt  file2.txt\nuser@host:~$ ",
+  "timestamp": "2026-02-04T12:00:00.000Z"
+}
+```
+
+**Error (404):**
+```json
+{
+  "error": "Session not found"
+}
+```
+
+**Error (503):**
+```json
+{
+  "error": "CHROTE API not available"
 }
 ```
 
@@ -571,6 +612,112 @@ const ws = new WebSocket('wss://example.com/ws');
   "message": "Viewers cannot send keys"
 }
 ```
+
+---
+
+## Per-Session WebSocket
+
+Connect to: `wss://example.com/ws/terminal/:sessionId`
+
+A simplified WebSocket endpoint for direct terminal connections. Unlike the main WebSocket which requires explicit subscribe/unsubscribe, this endpoint automatically subscribes to a single session and streams only that session's output.
+
+### Connection
+
+```javascript
+// Connect to a specific session
+const ws = new WebSocket('wss://example.com/ws/terminal/chrote-chat');
+
+// Optionally specify pane
+const ws = new WebSocket('wss://example.com/ws/terminal/chrote-chat?pane=1');
+```
+
+**Authentication:** Requires valid session cookie (same as main WebSocket).
+
+**On Connect:**
+- Server validates session exists (returns 4004 if not found)
+- Server authenticates user (returns 4001 if not authenticated)
+- Server automatically subscribes to the session
+- Server sends `connected` message with session info
+- Server sends initial terminal output
+
+### Client to Server Messages
+
+#### Send Keys
+
+**Required:** Operator+ role AND own claim on the session
+
+```json
+{
+  "type": "sendKeys",
+  "keys": "ls -la\n",
+  "pane": "0"
+}
+```
+
+#### Heartbeat
+
+```json
+{
+  "type": "heartbeat"
+}
+```
+
+### Server to Client Messages
+
+#### Connected
+
+Sent immediately after successful connection.
+
+```json
+{
+  "type": "connected",
+  "sessionId": "chrote-chat",
+  "userId": "user_123",
+  "role": "operator"
+}
+```
+
+#### Terminal Output
+
+```json
+{
+  "type": "output",
+  "sessionId": "chrote-chat",
+  "pane": "0",
+  "data": "user@host:~$ ls\nfile1.txt\nuser@host:~$ ",
+  "timestamp": "2026-02-03T12:00:00.000Z"
+}
+```
+
+#### Error
+
+```json
+{
+  "type": "error",
+  "code": "NOT_CLAIMED",
+  "message": "You must claim the session before sending keys"
+}
+```
+
+### Error Codes
+
+| Code | Description |
+|------|-------------|
+| `SESSION_NOT_FOUND` | Session does not exist |
+| `NOT_OPERATOR` | Only operators can send keys |
+| `NOT_CLAIMED` | Must claim session before sending keys |
+| `TMUX_ERROR` | Error sending keys to tmux |
+| `INVALID_MESSAGE` | Invalid JSON message |
+| `UNKNOWN_TYPE` | Unknown message type |
+
+### Close Codes
+
+| Code | Meaning |
+|------|---------|
+| `4001` | Authentication required |
+| `4004` | Session not found |
+| `4000` | Heartbeat timeout |
+| `1001` | Server shutting down |
 
 ---
 
