@@ -8,7 +8,7 @@
     "dev:ui": "cd ui && bun run dev",
     "build": "bun build src/server/index.ts --outdir=dist --target=bun",
     "build:ui": "cd ui && bun run build",
-    "test": "bun test",
+    "test": "bun test tests/unit/*.test.ts tests/integration/*.test.ts",
     "test:watch": "bun test --watch",
     "test:e2e": "bunx playwright test",
     "test:e2e:ui": "bunx playwright test --ui",
