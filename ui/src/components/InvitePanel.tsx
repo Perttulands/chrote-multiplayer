@@ -148,7 +148,7 @@ export function InvitePanel({ isOpen, onClose }: InvitePanelProps) {
               <div>
                 <label className="block text-xs text-gray-400 mb-1.5">Role</label>
                 <div className="flex gap-2">
-                  {(['viewer', 'operator'] as const).map((r) => (
+                  {(['viewer', 'operator', 'admin'] as const).map((r) => (
                     <button
                       key={r}
                       onClick={() => setRole(r)}

@@ -10,6 +10,7 @@ import 'tldraw/tldraw.css'
 import { useMemo, useEffect, useCallback, createContext, useContext, useState, useRef } from 'react'
 import { TerminalShapeUtil, TERMINAL_WIDTH, TERMINAL_HEIGHT, type TerminalShape } from '../shapes'
 import { useAuthStore } from '../stores/auth'
+import { useLocksStore } from '../stores/locks'
 import { useYjsCollaboration } from '../hooks/useYjsCollaboration'
 import { LiveCursors, ConnectionStatus } from './Presence'
 
@@ -26,12 +27,14 @@ interface SessionDragData {
 
 interface TerminalContextValue {
   currentUserId: string | null
+  claimedSessionId: string | null
   claimSession: (sessionId: string) => void
   releaseSession: (sessionId: string) => void
 }
 
 const TerminalContext = createContext<TerminalContextValue>({
   currentUserId: null,
+  claimedSessionId: null,
   claimSession: () => {},
   releaseSession: () => {},
 })
@@ -47,6 +50,7 @@ export const useTerminalContext = () => useContext(TerminalContext)
 // we use a global reference that's set by the Canvas component
 let terminalContextRef: TerminalContextValue = {
   currentUserId: null,
+  claimedSessionId: null,
   claimSession: () => {},
   releaseSession: () => {},
 }
@@ -184,6 +188,9 @@ export function Canvas({ className }: CanvasProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
 
+  // Track the session currently claimed by this user
+  const [claimedSessionId, setClaimedSessionId] = useState<string | null>(null)
+
   // Yjs collaboration for presence/cursors
   const {
     otherUsers,
@@ -283,32 +290,51 @@ export function Canvas({ className }: CanvasProps) {
   // Claim session handler
   const claimSession = useCallback((sessionId: string) => {
     if (wsRef.current.readyState === WebSocket.OPEN) {
+      // Release any previously claimed session first
+      const prevClaimed = claimedSessionId
+      if (prevClaimed && prevClaimed !== sessionId) {
+        wsRef.current.send(JSON.stringify({ type: 'release', sessionId: prevClaimed }))
+      }
       wsRef.current.send(JSON.stringify({ type: 'claim', sessionId }))
+      setClaimedSessionId(sessionId)
     }
-  }, [wsRef])
+  }, [wsRef, claimedSessionId])
 
   // Release session handler
   const releaseSession = useCallback((sessionId: string) => {
     if (wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'release', sessionId }))
+      if (claimedSessionId === sessionId) {
+        setClaimedSessionId(null)
+      }
     }
-  }, [wsRef])
+  }, [wsRef, claimedSessionId])
+
+  // Release current claim (for click-away)
+  const releaseCurrentClaim = useCallback(() => {
+    if (claimedSessionId && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'release', sessionId: claimedSessionId }))
+      setClaimedSessionId(null)
+    }
+  }, [wsRef, claimedSessionId])
 
   // Update global context reference
   useEffect(() => {
     terminalContextRef = {
       currentUserId: user?.id ?? null,
+      claimedSessionId,
       claimSession,
       releaseSession,
     }
-  }, [user?.id, claimSession, releaseSession])
+  }, [user?.id, claimedSessionId, claimSession, releaseSession])
 
   // Context value (for components that can use context)
   const contextValue = useMemo<TerminalContextValue>(() => ({
     currentUserId: user?.id ?? null,
+    claimedSessionId,
     claimSession,
     releaseSession,
-  }), [user?.id, claimSession, releaseSession])
+  }), [user?.id, claimedSessionId, claimSession, releaseSession])
 
   return (
     <TerminalContext.Provider value={contextValue}>
@@ -351,6 +377,47 @@ export function Canvas({ className }: CanvasProps) {
               colorScheme: 'dark',
             })
 
+            // Listen for selection changes to detect click-away and auto-claim
+            editor.store.listen(
+              (entry) => {
+                // Check if this is a selection-related change
+                if (entry.source !== 'user') return
+
+                const selectedIds = editor.getSelectedShapeIds()
+
+                // If nothing selected, release current claim
+                if (selectedIds.length === 0) {
+                  releaseCurrentClaim()
+                  return
+                }
+
+                // Check selected shapes
+                const shapes = selectedIds.map((id) => editor.getShape(id)).filter(Boolean)
+                const terminals = shapes.filter((s) => s?.type === 'terminal') as TerminalShape[]
+
+                if (terminals.length === 0) {
+                  // Selected something that's not a terminal - release claim
+                  releaseCurrentClaim()
+                  return
+                }
+
+                // Auto-claim the selected terminal if it's not locked
+                const selectedTerminal = terminals[0]
+                if (selectedTerminal && !selectedTerminal.props.lockedBy) {
+                  // Claim this terminal
+                  claimSession(selectedTerminal.props.sessionId)
+                } else if (
+                  selectedTerminal &&
+                  selectedTerminal.props.lockedBy !== user?.id &&
+                  claimedSessionId
+                ) {
+                  // Selected a terminal locked by someone else - release our claim
+                  releaseCurrentClaim()
+                }
+              },
+              { scope: 'document', source: 'user' }
+            )
+
             // Listen for lock state changes from WebSocket
             const ws = wsRef.current
 
@@ -359,6 +426,25 @@ export function Canvas({ className }: CanvasProps) {
                 const msg = JSON.parse(event.data)
 
                 if (msg.type === 'claimed' || msg.type === 'released') {
+                  // Update locks store so sidebar ClaimControls stay in sync
+                  const { setLock } = useLocksStore.getState()
+                  if (msg.type === 'claimed') {
+                    setLock(msg.sessionId, {
+                      sessionId: msg.sessionId,
+                      lockedBy: { id: msg.by.id, name: msg.by.name },
+                    })
+                    // Sync local claimed state if this user claimed it
+                    if (msg.by.id === user?.id) {
+                      setClaimedSessionId(msg.sessionId)
+                    }
+                  } else {
+                    setLock(msg.sessionId, null)
+                    // Clear local claimed state if our claim was released
+                    if (msg.sessionId === claimedSessionId) {
+                      setClaimedSessionId(null)
+                    }
+                  }
+
                   // Find terminal shapes with this sessionId and update lock state
                   const shapes = editor.getCurrentPageShapes()
                   for (const shape of shapes) {

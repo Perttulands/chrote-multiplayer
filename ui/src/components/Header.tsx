@@ -1,8 +1,13 @@
 import { useState } from 'react'
-import type { User } from '@/types'
+import type { User, UserRole } from '@/types'
 import { useSessionStore } from '@/stores/session'
 import { InvitePanel } from './InvitePanel'
 import { UserManagementPanel } from './UserManagementPanel'
+
+/** Check if user has admin+ role */
+function isAdmin(role: UserRole | undefined): boolean {
+  return role === 'admin' || role === 'owner'
+}
 
 interface HeaderProps {
   user: User | null
@@ -114,8 +119,8 @@ export function Header({ user, onLogout }: HeaderProps) {
 
       {/* User section */}
       <div className="flex items-center gap-2">
-        {/* Manage Users button */}
-        {user && (
+        {/* Manage Users button (admin+ only) */}
+        {user && isAdmin(user.role) && (
           <button
             onClick={() => setShowUserPanel(true)}
             className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-terminal-hover transition-colors"
@@ -132,8 +137,8 @@ export function Header({ user, onLogout }: HeaderProps) {
           </button>
         )}
 
-        {/* Invite button (admin only - shown when user exists) */}
-        {user && (
+        {/* Invite button (admin+ only) */}
+        {user && isAdmin(user.role) && (
           <button
             onClick={() => setShowInvitePanel(true)}
             className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-terminal-hover transition-colors"

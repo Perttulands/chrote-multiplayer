@@ -1,4 +1,6 @@
 export { useSessionStore } from './session'
 export { useLocksStore } from './locks'
 export { useAuthStore, getOAuthLoginUrl, getAuthErrorFromUrl, clearAuthErrorFromUrl } from './auth'
+export { useUsersStore } from './users'
 export type { AuthUser, AuthProviders } from './auth'
+export type { ManagedUser } from './users'

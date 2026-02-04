@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Header, Sidebar, Canvas, LoginPage } from '@/components'
 import { useSessionStore } from '@/stores/session'
 import { useAuthStore } from '@/stores/auth'
+import { useLocksStore } from '@/stores/locks'
 import type { Session } from '@/types'
 
 // Demo sessions for fallback when API is unavailable
@@ -29,13 +30,14 @@ const DEMO_SESSIONS: Session[] = [
 function App() {
   const { setSessions, setConnected, fetchSessions } = useSessionStore()
   const { user, isLoading, isInitialized, checkAuth, logout, getUIUser } = useAuthStore()
+  const { fetchLocks, clearLocks } = useLocksStore()
 
   // Check authentication on mount
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
-  // Fetch sessions when authenticated
+  // Fetch sessions and locks when authenticated
   useEffect(() => {
     if (user) {
       fetchSessions().catch(() => {
@@ -43,8 +45,9 @@ function App() {
         setSessions(DEMO_SESSIONS)
         setConnected(true)
       })
+      fetchLocks().catch(() => {})
     }
-  }, [user, fetchSessions, setSessions, setConnected])
+  }, [user, fetchSessions, setSessions, setConnected, fetchLocks])
 
   // Refresh sessions periodically when authenticated
   useEffect(() => {
@@ -61,6 +64,7 @@ function App() {
     await logout()
     setSessions([])
     setConnected(false)
+    clearLocks()
   }
 
   // Show loading spinner while checking auth

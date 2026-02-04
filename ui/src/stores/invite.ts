@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import type { Invite, CreateInviteRequest, CreateInviteResponse } from '@/types'
 
-const CHROTE_API = import.meta.env.VITE_CHROTE_API || 'http://chrote:8080'
+// API base URL (same origin by default - invites are on main server, not chrote)
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 interface InviteState {
   invites: Invite[]
@@ -29,7 +30,7 @@ export const useInviteStore = create<InviteState>((set, get) => ({
   fetchInvites: async () => {
     set({ isLoading: true, error: null })
     try {
-      const response = await fetch(`${CHROTE_API}/api/invites`, {
+      const response = await fetch(`${API_BASE}/api/invites`, {
         credentials: 'include',
       })
       if (!response.ok) {
@@ -51,7 +52,7 @@ export const useInviteStore = create<InviteState>((set, get) => ({
   createInvite: async (data: CreateInviteRequest) => {
     set({ isLoading: true, error: null })
     try {
-      const response = await fetch(`${CHROTE_API}/api/invites`, {
+      const response = await fetch(`${API_BASE}/api/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -78,7 +79,7 @@ export const useInviteStore = create<InviteState>((set, get) => ({
   revokeInvite: async (id: string) => {
     set({ isLoading: true, error: null })
     try {
-      const response = await fetch(`${CHROTE_API}/api/invites/${id}`, {
+      const response = await fetch(`${API_BASE}/api/invites/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       })

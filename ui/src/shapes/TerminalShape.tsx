@@ -230,16 +230,16 @@ const TerminalContent = memo(function TerminalContent({
     }
   }, [isLocked, isLockedByMe, onClaim])
 
-  // Lock badge color
+  // Lock badge color and styling
   const getBorderColor = () => {
     if (!isLocked) return 'border-zinc-700'
-    if (isLockedByMe) return 'border-indigo-500'
+    if (isLockedByMe) return 'border-indigo-500 shadow-lg shadow-indigo-500/20'
     return 'border-amber-500'
   }
 
   return (
     <div
-      className={`terminal-shape rounded-lg overflow-hidden border-2 ${getBorderColor()} bg-zinc-900`}
+      className={`terminal-shape rounded-lg overflow-hidden border-2 transition-colors duration-200 ${getBorderColor()} bg-zinc-900`}
       style={{ width: TERMINAL_WIDTH, height: TERMINAL_HEIGHT }}
       onClick={handleClick}
     >
@@ -284,9 +284,11 @@ const TerminalContent = memo(function TerminalContent({
       />
 
       {/* Overlay when locked by others */}
-      {isLocked && !isLockedByMe && (
-        <div className="absolute inset-0 top-8 bg-black/20 pointer-events-none" />
-      )}
+      <div
+        className={`absolute inset-0 top-8 pointer-events-none transition-opacity duration-200 ${
+          isLocked && !isLockedByMe ? 'bg-black/20 opacity-100' : 'opacity-0'
+        }`}
+      />
     </div>
   )
 })
