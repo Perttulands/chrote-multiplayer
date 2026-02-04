@@ -10,6 +10,8 @@ import 'tldraw/tldraw.css'
 import { useMemo, useEffect, useCallback, createContext, useContext, useState, useRef } from 'react'
 import { TerminalShapeUtil, TERMINAL_WIDTH, TERMINAL_HEIGHT, type TerminalShape } from '../shapes'
 import { useAuthStore } from '../stores/auth'
+import { useYjsCollaboration } from '../hooks/useYjsCollaboration'
+import { LiveCursors, ConnectionStatus } from './Presence'
 
 // Drag data type
 interface SessionDragData {
@@ -180,6 +182,37 @@ export function Canvas({ className }: CanvasProps) {
   const user = getUIUser()
   const editorRef = useRef<Editor | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const canvasRef = useRef<HTMLDivElement>(null)
+
+  // Yjs collaboration for presence/cursors
+  const {
+    otherUsers,
+    updateCursor,
+    clearCursor,
+    status: yjsStatus,
+  } = useYjsCollaboration({
+    documentName: 'canvas-presence',
+    user: user ? {
+      id: user.id,
+      name: user.name,
+      avatar: user.avatarUrl,
+    } : {
+      id: 'anonymous',
+      name: 'Anonymous',
+    },
+  })
+
+  // Track mouse movement for cursor sharing
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    updateCursor(e.clientX - rect.left, e.clientY - rect.top)
+  }, [updateCursor])
+
+  // Clear cursor when mouse leaves
+  const handleMouseLeave = useCallback(() => {
+    clearCursor()
+  }, [clearCursor])
 
   // WebSocket reference for claim/release
   const wsRef = useMemo(() => {
@@ -280,11 +313,22 @@ export function Canvas({ className }: CanvasProps) {
   return (
     <TerminalContext.Provider value={contextValue}>
       <div
+        ref={canvasRef}
         className={`w-full h-full relative ${className || ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
+        {/* Live cursors from other users */}
+        <LiveCursors users={otherUsers} />
+
+        {/* Connection status indicator */}
+        <div className="absolute top-4 right-4 z-40 pointer-events-auto">
+          <ConnectionStatus status={yjsStatus} />
+        </div>
+
         {/* Drop zone indicator */}
         {isDragOver && (
           <div className="absolute inset-0 z-50 pointer-events-none border-4 border-dashed border-accent-primary/60 bg-accent-primary/5 flex items-center justify-center">

@@ -1,16 +1,20 @@
 import { create } from 'zustand'
 import type { Session, User } from '@/types'
 
-// CHROTE API response type
-interface ChroteSession {
+// Backend API response type (from /api/terminal/sessions)
+interface TmuxSession {
   name: string
-  created: string
-  attached: boolean
   windows: number
+  attached: number
+  created: string
+  id: string
+  currentWindow?: string
+  width?: number
+  height?: number
 }
 
-// CHROTE API base URL
-const CHROTE_API = import.meta.env.VITE_CHROTE_API || 'http://chrote:8080'
+// Backend API base URL (relative to same origin)
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 interface SessionState {
   // Current user
@@ -72,25 +76,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  // Fetch sessions from CHROTE API
+  // Fetch sessions from backend API (which proxies to CHROTE)
   fetchSessions: async () => {
     set({ isLoading: true, error: null })
     try {
-      const response = await fetch(`${CHROTE_API}/api/tmux/sessions`)
+      const response = await fetch(`${API_BASE}/api/terminal/sessions`, {
+        credentials: 'include', // Include auth cookies
+      })
       if (!response.ok) {
         throw new Error(`Failed to fetch sessions: ${response.statusText}`)
       }
-      const chroteSessions: ChroteSession[] = await response.json()
+      const data: { sessions: TmuxSession[] } = await response.json()
 
-      // Transform CHROTE sessions to our Session type
-      const sessions: Session[] = chroteSessions.map((cs) => ({
-        id: cs.name, // Use tmux session name as ID
-        name: cs.name,
+      // Transform TmuxSession to our Session type
+      const sessions: Session[] = data.sessions.map((ts) => ({
+        id: ts.name, // Use tmux session name as ID
+        name: ts.name,
         hostId: 'system', // System-managed sessions
-        tmuxSession: cs.name,
-        createdAt: new Date(cs.created),
-        status: cs.attached ? 'active' : 'paused',
-        participants: [], // No participants tracked yet
+        tmuxSession: ts.name,
+        createdAt: ts.created ? new Date(ts.created) : new Date(),
+        status: ts.attached > 0 ? 'active' : 'paused',
+        participants: [], // Participants tracked via Yjs awareness
       }))
 
       set({ sessions, isLoading: false, isConnected: true })

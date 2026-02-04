@@ -17,9 +17,12 @@ interface SessionWatchState {
   lockedSessionId?: string | null
 }
 
+// Yjs/Hocuspocus server URL from env or default
+const YJS_SERVER_URL = import.meta.env.VITE_YJS_URL || 'ws://localhost:4001'
+
 /** Hook options */
 interface UseSessionAwarenessOptions {
-  /** Hocuspocus server URL (default: ws://localhost:3001) */
+  /** Hocuspocus server URL */
   serverUrl?: string
   /** Current user info */
   user: {
@@ -52,7 +55,7 @@ function getUserColor(userId: string): string {
  */
 export function useSessionAwareness(options: UseSessionAwarenessOptions) {
   const {
-    serverUrl = 'ws://localhost:3001',
+    serverUrl = YJS_SERVER_URL,
     user,
     onStatusChange,
   } = options

@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSessionAwareness } from '@/hooks/useSessionAwareness'
 
 export function Sidebar() {
-  const { sessions, activeSessionId } = useSessionStore()
+  const { sessions, activeSessionId, isLoading, error, fetchSessions } = useSessionStore()
   const { getUIUser } = useAuthStore()
   const user = getUIUser()
 
@@ -78,7 +78,24 @@ export function Sidebar() {
 
       {/* Session list */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
-        <SessionList sessions={sessions} sessionAwareness={sessionAwareness} />
+        {isLoading ? (
+          <div className="p-4 flex flex-col items-center justify-center text-gray-500">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent-primary mb-2" />
+            <p className="text-sm">Loading sessions...</p>
+          </div>
+        ) : error ? (
+          <div className="p-4 text-center">
+            <p className="text-red-400 text-sm mb-2">{error}</p>
+            <button
+              onClick={() => fetchSessions()}
+              className="text-xs text-accent-primary hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <SessionList sessions={sessions} sessionAwareness={sessionAwareness} />
+        )}
       </div>
 
       {/* Footer actions */}

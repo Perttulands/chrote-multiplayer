@@ -23,11 +23,14 @@ export interface AwarenessUser {
 /** Connection state */
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'synced'
 
+// Yjs/Hocuspocus server URL from env or default
+const YJS_SERVER_URL = import.meta.env.VITE_YJS_URL || 'ws://localhost:4001'
+
 /** Hook options */
 export interface UseYjsCollaborationOptions {
   /** Document/room name */
   documentName: string
-  /** Hocuspocus server URL (default: ws://localhost:3001) */
+  /** Hocuspocus server URL */
   serverUrl?: string
   /** Current user info */
   user: {
@@ -63,7 +66,7 @@ function getUserColor(userId: string): string {
 export function useYjsCollaboration(options: UseYjsCollaborationOptions) {
   const {
     documentName,
-    serverUrl = 'ws://localhost:3001',
+    serverUrl = YJS_SERVER_URL,
     user,
     onStatusChange,
     onAwarenessChange,

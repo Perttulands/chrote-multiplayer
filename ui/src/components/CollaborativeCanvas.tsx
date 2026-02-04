@@ -21,6 +21,9 @@ import 'tldraw/tldraw.css'
 import { LiveCursors, ConnectionStatus as ConnectionStatusBadge } from './Presence'
 import type { AwarenessUser } from '@/hooks/useYjsCollaboration'
 
+// Yjs/Hocuspocus server URL from env or default
+const YJS_SERVER_URL = import.meta.env.VITE_YJS_URL || 'ws://localhost:4001'
+
 /** Default user colors */
 const USER_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
@@ -137,7 +140,7 @@ type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'synced'
  */
 export function CollaborativeCanvas({
   roomId,
-  serverUrl = 'ws://localhost:3001',
+  serverUrl = YJS_SERVER_URL,
   user,
   className,
 }: CollaborativeCanvasProps) {
