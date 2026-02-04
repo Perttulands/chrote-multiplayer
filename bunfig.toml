@@ -1,0 +1,3 @@
+[test]
+# Only run unit tests (e2e tests use Playwright via `bun run test:e2e`)
+root = "tests/unit"

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
 import { join } from "path";
 import { mkdirSync, rmSync, existsSync, readFileSync, readdirSync } from "fs";
 
@@ -13,7 +13,7 @@ const TEST_DB_PATH = join(process.cwd(), "data", "test-chrote.db");
 const MIGRATIONS_DIR = join(process.cwd(), "db", "migrations");
 
 describe("Database Schema", () => {
-  let db: Database.Database;
+  let db: Database;
 
   beforeAll(() => {
     // Clean up any existing test database
@@ -24,8 +24,8 @@ describe("Database Schema", () => {
 
     // Create and migrate test database
     db = new Database(TEST_DB_PATH);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
+    db.exec("PRAGMA journal_mode = WAL");
+    db.exec("PRAGMA foreign_keys = ON");
 
     // Apply migrations
     const migrationFiles = readdirSync(MIGRATIONS_DIR)
@@ -135,7 +135,7 @@ describe("Database Schema", () => {
     // Delete
     db.prepare("DELETE FROM users WHERE id = ?").run(userId);
     const deleted = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
-    expect(deleted).toBeUndefined();
+    expect(deleted).toBeNull();
   });
 
   it("should cascade delete claims when user is deleted", () => {
@@ -164,6 +164,6 @@ describe("Database Schema", () => {
     const deletedClaim = db
       .prepare("SELECT * FROM claims WHERE id = ?")
       .get(claimId);
-    expect(deletedClaim).toBeUndefined();
+    expect(deletedClaim).toBeNull();
   });
 });

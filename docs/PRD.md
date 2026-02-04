@@ -232,6 +232,77 @@ class TerminalShape extends BaseShape {
 }
 ```
 
+## Testing Strategy
+
+### Test Pyramid
+
+| Level | Framework | Focus | Coverage Target |
+|-------|-----------|-------|-----------------|
+| Unit | Bun test | Pure functions, utilities, schemas | 80%+ |
+| Integration | Bun test | API routes, DB operations, WS protocol | 70%+ |
+| E2E | Playwright | User flows, multi-user scenarios | Critical paths |
+
+### Unit Tests (`tests/unit/`)
+
+Test in isolation with mocks:
+- **auth.test.ts**: Token hashing, role hierarchy, session expiration
+- **db.test.ts**: Schema validation, query builders
+- **permissions.test.ts**: RBAC logic, role transitions
+- **users.test.ts**: User CRUD, validation
+- **invites.test.ts**: Invite generation, validation, expiration
+- **tmux.test.ts**: CHROTE proxy, session lifecycle
+- **ws-protocol.test.ts**: Message framing, reconnection logic
+- **server.test.ts**: Health checks, middleware
+
+### Integration Tests (`tests/integration/`)
+
+Test subsystems together:
+- **api.test.ts**: REST endpoints with test DB
+- **websocket.test.ts**: Real WS connections, message flow
+- **yjs-sync.test.ts**: CRDT operations, conflict resolution
+- **auth-flow.test.ts**: OAuth mocks, session management
+
+### E2E Tests (`tests/e2e/`)
+
+Multi-browser scenarios with Playwright:
+- **auth.spec.ts**: Login flows, session persistence
+- **terminal.spec.ts**: Output display, ANSI rendering
+- **claim.spec.ts**: Lock/release mechanics
+- **presence.spec.ts**: Cursor sync, awareness
+- **invite.spec.ts**: Invite creation, redemption
+- **reconnection.spec.ts**: Network resilience
+- **user-management.spec.ts**: Admin actions
+
+### Running Tests
+
+```bash
+# Unit tests (fast, run often)
+bun test
+bun test --watch
+
+# E2E tests (slower, pre-commit)
+bun run test:e2e
+bun run test:e2e:headed    # See browsers
+bun run test:e2e:debug     # Step through
+
+# Full suite
+bun test && bun run test:e2e
+```
+
+### Test Data
+
+- **Fixtures**: Seeded test users/sessions in `tests/e2e/fixtures/`
+- **Mocks**: API/WebSocket mocks in `tests/e2e/helpers/`
+- **Test DB**: Ephemeral SQLite for each integration test run
+
+### CI Pipeline
+
+Tests run on every PR:
+1. `bun run typecheck` - Type validation
+2. `bun run lint` - Code style
+3. `bun test` - Unit + integration
+4. `bun run test:e2e` - E2E (headless)
+
 ## Non-Goals (v1)
 
 - Voice/video chat (use Discord/Meet)

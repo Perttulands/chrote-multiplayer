@@ -8,13 +8,11 @@ import { describe, it, expect } from "bun:test";
 
 describe("Server", () => {
   it("should start and respond to health check", async () => {
-    // Import the server
-    const server = await import("../../src/server/index");
+    // Import the Hono app directly (bypasses Bun server wrapper)
+    const { app } = await import("../../src/server/index");
 
     // Make a health check request
-    const response = await server.default.fetch(
-      new Request("http://localhost/health")
-    );
+    const response = await app.fetch(new Request("http://localhost/health"));
 
     expect(response.status).toBe(200);
 
@@ -25,11 +23,9 @@ describe("Server", () => {
   });
 
   it("should return API info at /api", async () => {
-    const server = await import("../../src/server/index");
+    const { app } = await import("../../src/server/index");
 
-    const response = await server.default.fetch(
-      new Request("http://localhost/api")
-    );
+    const response = await app.fetch(new Request("http://localhost/api"));
 
     expect(response.status).toBe(200);
 

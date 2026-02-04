@@ -187,6 +187,9 @@ interface WSData {
 // Export wsServer for other modules
 export { wsServer };
 
+// Export Hono app for direct testing (bypasses Bun server wrapper)
+export { app };
+
 // Export Bun server configuration (Bun will call Bun.serve() with this)
 export default {
   port,
