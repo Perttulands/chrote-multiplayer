@@ -9,7 +9,7 @@
  */
 
 import { nanoid } from "nanoid";
-import type { Server as HTTPServer } from "http";
+import type { Server as _HTTPServer } from "http";
 import type {
   ClientMessage,
   ServerMessage,
@@ -242,10 +242,11 @@ export class TerminalWSServer {
           this.handleRelease(client, message.sessionId);
           break;
 
-        case "listSessions":
+        case "listSessions": {
           const sessions = await this.chrote.listSessions();
           this.send(ws, { type: "sessions", sessions });
           break;
+        }
 
         default:
           this.sendError(

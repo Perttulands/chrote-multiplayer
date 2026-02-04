@@ -68,7 +68,7 @@ export async function getGitHubUser(accessToken: string): Promise<GitHubUser> {
     throw new Error(`GitHub API error: ${response.status}`);
   }
 
-  return response.json();
+  return response.json() as Promise<GitHubUser>;
 }
 
 export async function getGitHubEmails(
@@ -85,7 +85,7 @@ export async function getGitHubEmails(
     throw new Error(`GitHub emails API error: ${response.status}`);
   }
 
-  return response.json();
+  return response.json() as Promise<{ email: string; primary: boolean; verified: boolean }[]>;
 }
 
 export async function getGoogleUser(accessToken: string): Promise<GoogleUser> {
@@ -102,7 +102,7 @@ export async function getGoogleUser(accessToken: string): Promise<GoogleUser> {
     throw new Error(`Google API error: ${response.status}`);
   }
 
-  return response.json();
+  return response.json() as Promise<GoogleUser>;
 }
 
 // === Validation ===

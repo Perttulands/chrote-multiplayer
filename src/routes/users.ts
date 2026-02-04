@@ -12,12 +12,13 @@ import { nanoid } from "nanoid";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 
-import { db, users, auditLog, type Role } from "../db";
+import { db, users, auditLog } from "../db";
 import { validateSession } from "../lib/session";
 import { canManageUsers, type Role as PermRole } from "../permissions";
 import { canChangeRole, canRemoveUser } from "../permissions/roles";
+import type { AppEnv } from "../types";
 
-const usersRouter = new Hono();
+const usersRouter = new Hono<AppEnv>();
 
 // === Schemas ===
 
@@ -75,7 +76,7 @@ usersRouter.get("/:id", requireAdmin, async (c) => {
 
   const user = db.query.users.findFirst({
     where: (u, { eq }) => eq(u.id, id),
-  });
+  }).sync();
 
   if (!user) {
     return c.json({ error: "User not found" }, 404);
@@ -117,7 +118,7 @@ usersRouter.patch("/:id/role", requireAdmin, async (c) => {
   // Get target user
   const targetUser = db.query.users.findFirst({
     where: (u, { eq }) => eq(u.id, id),
-  });
+  }).sync();
 
   if (!targetUser) {
     return c.json({ error: "User not found" }, 404);
@@ -201,7 +202,7 @@ usersRouter.delete("/:id", requireAdmin, async (c) => {
   // Get target user
   const targetUser = db.query.users.findFirst({
     where: (u, { eq }) => eq(u.id, id),
-  });
+  }).sync();
 
   if (!targetUser) {
     return c.json({ error: "User not found" }, 404);

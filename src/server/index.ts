@@ -143,9 +143,14 @@ hocuspocus.listen(yjsPort).then(() => {
 
 // Yjs stats endpoint
 app.get("/api/yjs/stats", (c) => {
+  // Cast to access internal methods (not in public types)
+  const server = hocuspocus as unknown as {
+    getConnectionsCount?: () => number;
+    getDocumentsCount?: () => number;
+  };
   return c.json({
-    connections: hocuspocus.getConnectionsCount(),
-    documents: hocuspocus.getDocumentsCount(),
+    connections: server.getConnectionsCount?.() ?? 0,
+    documents: server.getDocumentsCount?.() ?? 0,
   });
 });
 

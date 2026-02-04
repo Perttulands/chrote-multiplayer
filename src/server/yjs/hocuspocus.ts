@@ -177,7 +177,7 @@ export function createHocuspocusServer(): HocuspocusServer {
 
     // Document changes (could add persistence here)
     async onChange(data) {
-      const { documentName, document } = data;
+      const { document } = data;
 
       // Update metadata
       const meta = document.getMap("meta");

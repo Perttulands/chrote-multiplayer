@@ -26,5 +26,5 @@ module.exports = {
     "@typescript-eslint/no-explicit-any": "warn",
     "no-console": ["warn", { allow: ["warn", "error", "info"] }],
   },
-  ignorePatterns: ["dist/", "node_modules/", "ui/", "*.cjs"],
+  ignorePatterns: ["dist/", "node_modules/", "ui/", "tests/", "*.cjs"],
 };

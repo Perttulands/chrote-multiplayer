@@ -28,9 +28,9 @@ export const users = sqliteTable(
     github_id: text("github_id").unique(),
     google_id: text("google_id").unique(),
 
-    // Invite tracking
-    invited_by: text("invited_by").references(() => users.id),
-    invite_id: text("invite_id").references(() => invites.id),
+    // Invite tracking (FKs handled at DB level to avoid circular refs)
+    invited_by: text("invited_by"),
+    invite_id: text("invite_id"),
 
     // Timestamps
     created_at: integer("created_at", { mode: "timestamp" })

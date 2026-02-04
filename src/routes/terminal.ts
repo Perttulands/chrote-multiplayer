@@ -14,6 +14,7 @@ import { getTmuxBridge } from "../server/tmux";
 import { getChroteClient } from "../server/chrote";
 import { ROLE_HIERARCHY, type Role } from "../db/schema";
 import type { TerminalWSServer } from "../server/ws";
+import type { AppEnv } from "../types";
 
 // WebSocket server instance (set after server initialization)
 let wsServer: TerminalWSServer | null = null;
@@ -25,7 +26,7 @@ export function setWSServer(server: TerminalWSServer): void {
   wsServer = server;
 }
 
-const terminal = new Hono();
+const terminal = new Hono<AppEnv>();
 
 // Require authentication for all terminal routes
 terminal.use("*", async (c, next) => {

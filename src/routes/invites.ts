@@ -13,8 +13,9 @@ import { z } from "zod";
 
 import { db, invites, users, auditLog, ROLE_HIERARCHY, type Role } from "../db";
 import { validateSession } from "../lib/session";
+import type { AppEnv } from "../types";
 
-const invitesRouter = new Hono();
+const invitesRouter = new Hono<AppEnv>();
 
 // === Schemas ===
 
@@ -162,7 +163,7 @@ invitesRouter.get("/:id", requireAdmin, async (c) => {
     with: {
       // Get users who used this invite
     },
-  });
+  }).sync();
 
   if (!invite) {
     return c.json({ error: "Invite not found" }, 404);
@@ -207,7 +208,7 @@ invitesRouter.delete("/:id", requireAdmin, async (c) => {
 
   const invite = db.query.invites.findFirst({
     where: (i, { eq }) => eq(i.id, id),
-  });
+  }).sync();
 
   if (!invite) {
     return c.json({ error: "Invite not found" }, 404);
@@ -254,7 +255,7 @@ invitesRouter.get("/:token/validate", async (c) => {
 
   const invite = db.query.invites.findFirst({
     where: (i, { eq }) => eq(i.token_hash, tokenHash),
-  });
+  }).sync();
 
   if (!invite) {
     return c.json({ valid: false, reason: "not_found" });

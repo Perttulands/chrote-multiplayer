@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { nanoid } from "nanoid";
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createHash } from "crypto";
 
 import { db, users, invites, auditLog } from "../db";
@@ -339,14 +339,14 @@ async function findOrCreateUser(
   const { email, name, avatar_url, github_id, google_id, pendingInvite } = params;
 
   // Check if user exists (by email or provider ID)
-  let existingUser = db.query.users.findFirst({
+  const existingUser = db.query.users.findFirst({
     where: (u, { or, eq }) =>
       or(
         eq(u.email, email),
         github_id ? eq(u.github_id, github_id) : undefined,
         google_id ? eq(u.google_id, google_id) : undefined
       ),
-  });
+  }).sync();
 
   if (existingUser) {
     // Update provider ID if not set
@@ -393,7 +393,7 @@ async function findOrCreateUser(
     const invite = db.query.invites.findFirst({
       where: (i, { eq, and }) =>
         and(eq(i.token_hash, tokenHash), eq(i.revoked, false)),
-    });
+    }).sync();
 
     if (!invite) {
       return { success: false, error: "invalid_invite" };
@@ -441,7 +441,7 @@ async function findOrCreateUser(
 
   const newUser = db.query.users.findFirst({
     where: (u, { eq }) => eq(u.id, userId),
-  });
+  }).sync();
 
   if (!newUser) {
     return { success: false, error: "user_creation_failed" };
